@@ -42,7 +42,38 @@ Config:
 - `DB_BACKUP_DIR` (default: `.backups`)
 - `DB_BACKUP_RETENTION_DAYS` (default: `14`)
 
-### Cron example (daily at 2:15 AM)
+### Production install for `careers.darumatic.com`
+Install the checked-in systemd timer on the VPS:
+```bash
+sudo bash scripts/install-nightly-backup-systemd.sh
+```
+
+Defaults:
+- unit name: `hire-gnome-db-backup`
+- schedule: daily at `2:15 AM` server local time (`*-*-* 02:15:00`)
+- rotation: prune backups older than `DB_BACKUP_RETENTION_DAYS`
+
+Useful overrides:
+```bash
+sudo BACKUP_RUN_USER=deploy \
+  BACKUP_ON_CALENDAR='*-*-* 03:30:00' \
+  BACKUP_SYSTEMD_NAME=hire-gnome-db-backup \
+  bash scripts/install-nightly-backup-systemd.sh
+```
+
+Verify:
+```bash
+systemctl list-timers hire-gnome-db-backup.timer
+systemctl status hire-gnome-db-backup.timer
+journalctl -u hire-gnome-db-backup.service -n 100 --no-pager
+```
+
+Manual run:
+```bash
+systemctl start hire-gnome-db-backup.service
+```
+
+### Cron alternative (daily at 2:15 AM)
 ```cron
 15 2 * * * cd /opt/hire-gnome-ats && /usr/bin/env npm run db:backup:scheduled >> /var/log/hire-gnome-backup.log 2>&1
 ```

@@ -403,6 +403,7 @@ All Node operational scripts in `scripts/` auto-load `.env` (and `.env.local` if
 | `npm run db:reset` | Stop + remove Docker MySQL volume |
 | `npm run db:backup` | One-off DB backup |
 | `npm run db:backup:scheduled` | Backup + retention cleanup |
+| `bash scripts/install-nightly-backup-systemd.sh` | Install nightly rotating backup timer on a systemd host |
 | `npm run db:restore -- --input <file> --drop-first` | Restore SQL backup |
 | `npm run demo:seed` | Seed realistic linked demo data (non-destructive to unrelated records) |
 | `npm run demo:reset` | Full DB reset + migration + realistic demo reseed |

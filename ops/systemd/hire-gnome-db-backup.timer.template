@@ -1,0 +1,12 @@
+[Unit]
+Description=Nightly Hire Gnome ATS database backup timer
+
+[Timer]
+OnCalendar=__ON_CALENDAR__
+Persistent=true
+RandomizedDelaySec=__RANDOMIZED_DELAY_SEC__
+Unit=__UNIT_NAME__.service
+
+[Install]
+WantedBy=timers.target
+

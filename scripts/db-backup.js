@@ -2,40 +2,12 @@
 
 require('./load-env.cjs');
 
-const { mkdirSync, readFileSync } = require('node:fs');
+const { mkdirSync } = require('node:fs');
 const { join, resolve } = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const projectRoot = resolve(__dirname, '..');
-const envPath = join(projectRoot, '.env');
 const defaultBackupDir = process.env.DB_BACKUP_DIR || join(projectRoot, '.backups');
-
-function parseEnvFile(filePath) {
-	const raw = readFileSync(filePath, 'utf8');
-	const values = {};
-
-	for (const line of raw.split(/\r?\n/)) {
-		const trimmed = line.trim();
-		if (!trimmed || trimmed.startsWith('#')) {
-			continue;
-		}
-
-		const separatorIndex = trimmed.indexOf('=');
-		if (separatorIndex < 0) {
-			continue;
-		}
-
-		const key = trimmed.slice(0, separatorIndex).trim();
-		let value = trimmed.slice(separatorIndex + 1).trim();
-		if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-			value = value.slice(1, -1);
-		}
-
-		values[key] = value;
-	}
-
-	return values;
-}
 
 function parseDatabaseUrl(databaseUrl) {
 	const parsed = new URL(databaseUrl);
@@ -94,14 +66,14 @@ function commandErrorMessage(commandResult) {
 }
 
 function backup() {
-	const env = parseEnvFile(envPath);
-	if (!env.DATABASE_URL) {
-		throw new Error('DATABASE_URL is required in .env for backup.');
+	const databaseUrl = String(process.env.DATABASE_URL || '').trim();
+	if (!databaseUrl) {
+		throw new Error('DATABASE_URL is required for backup.');
 	}
 
 	let config;
 	try {
-		config = parseDatabaseUrl(env.DATABASE_URL);
+		config = parseDatabaseUrl(databaseUrl);
 	} catch {
 		throw new Error('DATABASE_URL is not a valid mysql URL.');
 	}

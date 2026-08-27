@@ -1,0 +1,17 @@
+[Unit]
+Description=Nightly Hire Gnome ATS database backup
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=__APP_USER__
+Group=__APP_GROUP__
+WorkingDirectory=__PROJECT_ROOT__
+Environment=HOME=__HOME_DIR__
+Environment=PATH=__PATH_VALUE__
+ExecStart=__NPM_BIN__ run db:backup:scheduled
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
