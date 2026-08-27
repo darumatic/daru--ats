@@ -58,6 +58,12 @@ Flags:
 - `--input <file>` required.
 - `--drop-first` optional; drops/recreates target DB before restore.
 
+## 3.1) Dependency Security
+
+- Dependabot alerts on this repo have so far all been transitive (`package-lock.json`). Fix them by bumping the direct dependency that pulls them in (for `postcss`/`sharp` that is `next` + `eslint-config-next`, kept on the same version) and running `npm update <pkg>` for the rest, which moves transitive instances to the newest version inside their existing ranges; check with `npm ls <pkg> --all` and `npm audit`. Only reach for `overrides` when the range itself is too old.
+- `npm audit` also flags `deepmerge-ts` (< 8) through `@prisma/config`, which is only used by the Prisma CLI. It is pinned to `^8` via `overrides` in `package.json`; `prisma generate`, `prisma validate` and `prisma migrate status` were verified with it. Drop that override once the Prisma version in use depends on `deepmerge-ts` 8+ itself.
+- After pushing a dependency change, confirm on GitHub that the alerts closed: `gh api "repos/<owner>/<repo>/dependabot/alerts?state=open" --jq length` should print `0`.
+
 ## 4) Health Monitoring
 
 Run health check:
