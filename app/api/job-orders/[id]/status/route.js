@@ -5,14 +5,11 @@ import { AccessControlError, addScopeToWhere, getActingUser, getEntityScope } fr
 import { logUpdate } from '@/lib/audit-log';
 import { parseRouteId, parseJsonBody, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
-import { JOB_ORDER_STATUS_VALUES, normalizeJobOrderStatusInput } from '@/lib/job-order-options';
+import { applyJobOrderStatusChange, jobOrderStatusField } from '@/lib/job-order-status';
 import { withApiLogging } from '@/lib/api-logging';
 
 const jobOrderStatusSchema = z.object({
-	status: z.preprocess(
-		(value) => normalizeJobOrderStatusInput(value),
-		z.enum(JOB_ORDER_STATUS_VALUES)
-	)
+	status: jobOrderStatusField
 });
 
 function handleError(error, fallbackMessage) {
@@ -48,32 +45,12 @@ async function patchJob_orders_id_statusHandler(req, { params }) {
 			return NextResponse.json({ errors: parsed.error.flatten() }, { status: 400 });
 		}
 
-		const nextStatus = parsed.data.status;
-		const statusDidChange = String(existing.status || '').trim() !== String(nextStatus || '').trim();
-		if (!statusDidChange) {
-			return NextResponse.json({
-				id: existing.id,
-				status: existing.status,
-				updatedAt: existing.updatedAt,
-				closedAt: existing.closedAt
-			});
-		}
-
-		const now = new Date();
-		const jobOrder = await prisma.jobOrder.update({
-			where: { id },
-			data: {
-				status: nextStatus,
-				closedAt: nextStatus === 'closed' ? now : null
-			},
-			select: { id: true, status: true, updatedAt: true, closedAt: true }
-		});
-
-		await logUpdate({
+		const { jobOrder } = await applyJobOrderStatusChange({
+			db: prisma,
+			existing,
+			nextStatus: parsed.data.status,
 			actorUserId: actingUser?.id,
-			entityType: 'JOB_ORDER',
-			before: existing,
-			after: jobOrder
+			logUpdate
 		});
 
 		return NextResponse.json(jobOrder);

@@ -392,6 +392,16 @@
 
 ---
 
+#### TC-JO-03b — Bulk close from the list
+**Steps:**
+1. Navigate to `/job-orders` in list view with at least two open job orders
+2. Tick two rows (or the header checkbox) and click **Close Selected (n)**
+3. Confirm the dialog
+
+**Expected:** Both rows show status **Closed** with an updated last-activity time, a success toast reports the count, the selection clears, and each job's audit trail has a status entry. Selecting an already-closed row disables the button (or the confirm says it will be skipped).
+
+---
+
 #### TC-JO-04 — Employment type options
 **Steps:**
 1. Open new job order form

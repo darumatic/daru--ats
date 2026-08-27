@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Filter, LayoutGrid, LayoutList, Plus, X } from 'lucide-react';
+import { Ban, Filter, LayoutGrid, LayoutList, Plus, X } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
 import JobOrderAdvancedSearchModal from '@/app/components/job-order-advanced-search-modal';
 import SavedListViews from '@/app/components/saved-list-views';
@@ -62,6 +62,8 @@ export default function JobOrdersPage() {
 	const [viewMode, setViewMode] = useState('list');
 	const [sortState, setSortState] = useState({ key: '', direction: 'asc' });
 	const [movingRowIds, setMovingRowIds] = useState(new Set());
+	const [selectedIds, setSelectedIds] = useState(() => new Set());
+	const [bulkClosing, setBulkClosing] = useState(false);
 	const { archivedIdSet } = useArchivedEntities('JOB_ORDER');
 
 	const activeRows = useMemo(
@@ -103,6 +105,17 @@ export default function JobOrdersPage() {
 	const filteredRows = useMemo(() => {
 		return quickFilteredRows.filter((row) => evaluateJobOrderAdvancedCriteria(row, normalizedAdvancedCriteria));
 	}, [normalizedAdvancedCriteria, quickFilteredRows]);
+
+	// Selection only counts rows that are currently listed, so rows hidden by a
+	// search/filter (or archived) are never acted on by mistake.
+	const selectedRows = useMemo(
+		() => filteredRows.filter((row) => selectedIds.has(String(row.id))),
+		[filteredRows, selectedIds]
+	);
+	const selectedOpenRows = useMemo(
+		() => selectedRows.filter((row) => String(row.status) !== 'closed'),
+		[selectedRows]
+	);
 
 	const advancedCriteriaSummary = useMemo(
 		() => normalizedAdvancedCriteria.map((criterion) => summarizeJobOrderAdvancedCriterion(criterion)).filter(Boolean),
@@ -207,6 +220,19 @@ export default function JobOrdersPage() {
 		setAdvancedCriteria((current) => current.filter((_, index) => index !== indexToRemove));
 	}
 
+	function setRowsMoving(ids, moving) {
+		setMovingRowIds((current) => {
+			const next = new Set(current);
+			ids.forEach((id) => (moving ? next.add(String(id)) : next.delete(String(id))));
+			return next;
+		});
+	}
+
+	function updateRowsById(ids, mapper) {
+		const keys = new Set(ids.map((id) => String(id)));
+		setRows((current) => current.map((row) => (keys.has(String(row.id)) ? mapper(row) : row)));
+	}
+
 	async function onMoveJobOrder(rowId, nextStatus) {
 		const target = rows.find((row) => String(row.id) === String(rowId));
 		if (!target) return;
@@ -224,16 +250,8 @@ export default function JobOrdersPage() {
 
 		const nextLabel = formatSelectValueLabel(nextStatus);
 		const optimisticTimestamp = new Date().toISOString();
-		setMovingRowIds((current) => {
-			const next = new Set(current);
-			next.add(String(rowId));
-			return next;
-		});
-		setRows((current) =>
-			current.map((row) =>
-				String(row.id) === String(rowId) ? updateStatusDisplay(row, nextStatus, optimisticTimestamp) : row
-			)
-		);
+		setRowsMoving([rowId], true);
+		updateRowsById([rowId], (row) => updateStatusDisplay(row, nextStatus, optimisticTimestamp));
 
 		try {
 			const res = await fetch(`/api/job-orders/${rowId}/status`, {
@@ -243,28 +261,82 @@ export default function JobOrdersPage() {
 			});
 			const data = await res.json().catch(() => ({}));
 			if (!res.ok) {
-				setRows((current) =>
-					current.map((row) => (String(row.id) === String(rowId) ? { ...target } : row))
-				);
+				updateRowsById([rowId], () => ({ ...target }));
 				toast.error(data.error || 'Failed to move job order.');
 				return;
 			}
 
 			const updatedTimestamp = data.updatedAt || optimisticTimestamp;
-			setRows((current) =>
-				current.map((row) =>
-					String(row.id) === String(rowId)
-						? updateStatusDisplay(row, data.status || nextStatus, updatedTimestamp)
-						: row
-				)
-			);
+			updateRowsById([rowId], (row) => updateStatusDisplay(row, data.status || nextStatus, updatedTimestamp));
 			toast.success(`Moved "${target.title}" to ${nextLabel}.`);
 		} finally {
-			setMovingRowIds((current) => {
-				const next = new Set(current);
-				next.delete(String(rowId));
-				return next;
+			setRowsMoving([rowId], false);
+		}
+	}
+
+	async function onCloseSelected() {
+		const targets = selectedOpenRows;
+		if (targets.length === 0 || bulkClosing) return;
+		const alreadyClosed = selectedRows.length - targets.length;
+		const preview = targets.slice(0, 5).map((row) => `\u2022 ${row.title}`);
+		const confirmed = await requestConfirm({
+			title: 'Close Job Orders',
+			message: [
+				`Close ${targets.length} job order${targets.length === 1 ? '' : 's'}?`,
+				...(alreadyClosed > 0
+					? [`${alreadyClosed} selected job order${alreadyClosed === 1 ? ' is' : 's are'} already closed and will be skipped.`]
+					: []),
+				'',
+				...preview,
+				...(targets.length > preview.length ? [`\u2026and ${targets.length - preview.length} more`] : [])
+			].join('\n'),
+			confirmLabel: 'Close',
+			cancelLabel: 'Cancel',
+			isDanger: true
+		});
+		if (!confirmed) return;
+
+		const targetIds = targets.map((row) => row.id);
+		const snapshots = new Map(targets.map((row) => [String(row.id), { ...row }]));
+		const optimisticTimestamp = new Date().toISOString();
+		setBulkClosing(true);
+		setRowsMoving(targetIds, true);
+		updateRowsById(targetIds, (row) => updateStatusDisplay(row, 'closed', optimisticTimestamp));
+
+		try {
+			const res = await fetch('/api/job-orders/bulk-status', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ ids: targetIds, status: 'closed' })
 			});
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				updateRowsById(targetIds, (row) => snapshots.get(String(row.id)) ?? row);
+				toast.error(data.error || 'Failed to close the selected job orders.');
+				return;
+			}
+
+			const updatedById = new Map((data.updated || []).map((item) => [String(item.id), item]));
+			const missing = new Set((data.missing || []).map((id) => String(id)));
+			updateRowsById(targetIds, (row) => {
+				const key = String(row.id);
+				if (missing.has(key)) return snapshots.get(key) ?? row;
+				const updated = updatedById.get(key);
+				return updateStatusDisplay(row, updated?.status || 'closed', updated?.updatedAt || optimisticTimestamp);
+			});
+			const closedCount = updatedById.size;
+			if (closedCount > 0) {
+				toast.success(`Closed ${closedCount} job order${closedCount === 1 ? '' : 's'}.`);
+			}
+			if (missing.size > 0) {
+				toast.error(
+					`${missing.size} job order${missing.size === 1 ? ' was' : 's were'} not found or not available for your role.`
+				);
+			}
+			setSelectedIds(new Set());
+		} finally {
+			setRowsMoving(targetIds, false);
+			setBulkClosing(false);
 		}
 	}
 
@@ -401,6 +473,34 @@ export default function JobOrdersPage() {
 						/>
 					)}
 					<div className="list-controls-toolbar-group job-orders-list-controls-tools">
+						{viewMode === 'list' && selectedRows.length > 0 ? (
+							<div className="job-orders-bulk-actions" role="group" aria-label="Selected job orders">
+								<button
+									type="button"
+									className="table-toolbar-button job-orders-bulk-close"
+									onClick={onCloseSelected}
+									disabled={bulkClosing || selectedOpenRows.length === 0}
+									title={
+										selectedOpenRows.length === 0
+											? 'All selected job orders are already closed'
+											: 'Close the selected job orders'
+									}
+								>
+									<Ban aria-hidden="true" />
+									{bulkClosing ? 'Closing\u2026' : `Close Selected (${selectedRows.length})`}
+								</button>
+								<button
+									type="button"
+									className="table-toolbar-button job-orders-bulk-clear"
+									onClick={() => setSelectedIds(new Set())}
+									disabled={bulkClosing}
+									aria-label="Clear selection"
+									title="Clear selection"
+								>
+									<X aria-hidden="true" />
+								</button>
+							</div>
+						) : null}
 						<button
 							type="button"
 							className="table-toolbar-button job-orders-advanced-search-toggle"
@@ -446,6 +546,8 @@ export default function JobOrdersPage() {
 						sortState={sortState.key ? sortState : undefined}
 						onSortStateChange={setSortState}
 						rowActions={[{ label: 'Open', onClick: onOpen }]}
+						selectedIds={selectedIds}
+						onSelectionChange={setSelectedIds}
 					/>
 				) : (
 					<KanbanBoard

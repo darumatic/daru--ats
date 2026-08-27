@@ -227,6 +227,10 @@ Common actions:
 - Toggle publish on
 - Add public description (required when publishing)
 
+Closing several job orders at once:
+1. In `Job Orders` (list view), tick the rows to close, or use the header checkbox for the whole page.
+2. Click `Close Selected (n)` in the toolbar and confirm. Already-closed rows are skipped.
+
 Submission workflow:
 - Add submissions directly from job order detail workspace.
 - Use `Priority Order` in the submissions workspace to rank submissions by recruiter preference.

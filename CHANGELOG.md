@@ -5,6 +5,8 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 ## [Unreleased]
 
 #### Changed
+- Job-order list rows can now be selected (per row or per page) and closed together with `Close Selected`, backed by a new `PATCH /api/job-orders/bulk-status` endpoint that applies the same scope, audit and `closedAt` rules as closing a single job order.
+- Upgraded Next.js to 16.3.3, refreshed vulnerable transitive packages (brace-expansion, nanoid, js-yaml, postcss, sharp) to close the open Dependabot alerts, and pinned `deepmerge-ts` to 8.x via npm overrides for the Prisma CLI (`npm audit` is clean).
 - Job orders no longer ask for Division, Owner, Client or Hiring Manager. New job orders are filed under a per-division `Unassigned` placeholder client (hidden from lists, snapshots and the public careers site), the owner defaults to the creating user, and existing job orders keep their stored assignments untouched when edited. The `Client` and `Owner` list columns are now hidden by default.
 - Candidate detail now includes a timeline-aware `Suggested Next Step` card in the snapshot area, with direct action links for likely recruiter follow-up.
 - Candidate names now display as `Last, First` in candidate-linked table/list views so sorting is more natural across candidates, submissions, interviews, placements, and job-order workspace lists.

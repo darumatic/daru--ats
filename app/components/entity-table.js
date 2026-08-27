@@ -27,6 +27,14 @@ import {
 	normalizeTableSortState,
 	tableSortStatesEqual
 } from '@/lib/table-sort';
+import {
+	isSelected,
+	normalizeSelection,
+	pageSelectionState,
+	togglePageSelection,
+	toggleSelection,
+	toSelectionId
+} from '@/lib/bulk-selection';
 
 const PAGE_SIZE_STORAGE_KEY = 'hg-list-page-size';
 const DEFAULT_PAGE_SIZE = 10;
@@ -101,9 +109,17 @@ export default function EntityTable({
 	loading = false,
 	loadingLabel = 'Loading records',
 	sortState: controlledSortState,
-	onSortStateChange
+	onSortStateChange,
+	selectedIds,
+	onSelectionChange,
+	isRowSelectable
 }) {
 	const hasActions = rowActions.length > 0;
+	// Row selection is opt-in: pass `selectedIds` + `onSelectionChange` to get a
+	// leading checkbox column (header checkbox toggles the current page).
+	const selectable = typeof onSelectionChange === 'function';
+	const selection = useMemo(() => normalizeSelection(selectedIds), [selectedIds]);
+	const leadingColumnCount = selectable ? 1 : 0;
 	const [pendingActionKey, setPendingActionKey] = useState('');
 	const [localSortState, setLocalSortState] = useState({ key: '', direction: 'asc' });
 	const [currentPage, setCurrentPage] = useState(1);
@@ -229,6 +245,17 @@ export default function EntityTable({
 	const startIndex = totalRows === 0 ? 0 : (currentPage - 1) * pageSize;
 	const endIndex = totalRows === 0 ? 0 : Math.min(startIndex + pageSize, totalRows);
 	const visibleRows = sortedRows.slice(startIndex, endIndex);
+	const canSelectRow = (row) => (typeof isRowSelectable === 'function' ? Boolean(isRowSelectable(row)) : true);
+	const selectablePageIds = selectable ? visibleRows.filter(canSelectRow).map((row) => row.id) : [];
+	const pageSelection = pageSelectionState(selection, selectablePageIds);
+
+	function onToggleRow(row) {
+		onSelectionChange?.(toggleSelection(selection, row.id));
+	}
+
+	function onTogglePage() {
+		onSelectionChange?.(togglePageSelection(selection, selectablePageIds));
+	}
 
 	function onSortColumn(column) {
 		if (column.sortable === false) return;
@@ -289,6 +316,21 @@ export default function EntityTable({
 				<table>
 					<thead>
 						<tr>
+							{selectable ? (
+								<th className="table-select-head">
+									<input
+										type="checkbox"
+										className="table-select-checkbox"
+										checked={pageSelection.all}
+										ref={(node) => {
+											if (node) node.indeterminate = pageSelection.some;
+										}}
+										disabled={loading || selectablePageIds.length === 0}
+										onChange={onTogglePage}
+										aria-label={pageSelection.all ? 'Deselect all rows on this page' : 'Select all rows on this page'}
+									/>
+								</th>
+							) : null}
 							{visibleColumns.map((column) => {
 								const isSortable = column.sortable !== false;
 								const isActive = effectiveSortState.key === column.key;
@@ -321,6 +363,7 @@ export default function EntityTable({
 						{loading ? (
 							Array.from({ length: skeletonRowCount }).map((_, rowIndex) => (
 								<tr key={`skeleton-${rowIndex}`} className="table-skeleton-row" aria-hidden="true">
+									{selectable ? <td className="table-select-cell table-skeleton-cell" /> : null}
 									{visibleColumns.map((column, columnIndex) => {
 										const width = `${42 + ((rowIndex + columnIndex) % 5) * 12}%`;
 										return (
@@ -342,13 +385,26 @@ export default function EntityTable({
 							))
 						) : totalRows === 0 ? (
 							<tr>
-								<td colSpan={visibleColumns.length + (hasActions ? 1 : 0)}>
+								<td colSpan={visibleColumns.length + leadingColumnCount + (hasActions ? 1 : 0)}>
 									<small>No records yet.</small>
 								</td>
 							</tr>
 						) : (
 							visibleRows.map((row) => (
-								<tr key={row.id}>
+								<tr key={row.id} className={selectable && isSelected(selection, row.id) ? 'table-row-selected' : undefined}>
+									{selectable ? (
+										<td className="table-select-cell">
+											{canSelectRow(row) ? (
+												<input
+													type="checkbox"
+													className="table-select-checkbox"
+													checked={isSelected(selection, row.id)}
+													onChange={() => onToggleRow(row)}
+													aria-label={`Select row ${toSelectionId(row.id)}`}
+												/>
+											) : null}
+										</td>
+									) : null}
 									{visibleColumns.map((column) => {
 										const renderedValue =
 											typeof column.render === 'function'

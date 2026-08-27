@@ -64,6 +64,12 @@ Job order detail also includes a unified `Timeline` workspace tab that rolls up 
 - Candidate match rows support `Explain Match`, which opens a saved AI explanation of fit, gaps, and recruiter validation points for that candidate/job pair.
 - If OpenAI is not configured, `Explain Match` remains visible but disabled with a tooltip/hint.
 
+## Bulk Close From The List
+- In the job-order list (table view) each row has a checkbox; the header checkbox selects or clears the current page.
+- With rows selected, the toolbar shows `Close Selected (n)` and a clear-selection button. Closing asks for confirmation, lists the first titles, and skips job orders that are already closed.
+- Only rows currently listed count: rows hidden by search, advanced filters or archiving are never closed by a stale selection.
+- The list sends one request (`PATCH /api/job-orders/bulk-status`, at most 100 ids) and the server applies the same rules as closing a single job order: records outside the user's division/owner scope are reported back as not available, each real change is audit-logged, and closing stamps `closedAt` (which also removes the job from the career site).
+
 ## Actions Menu
 Typical actions include:
 - Client Review Portal

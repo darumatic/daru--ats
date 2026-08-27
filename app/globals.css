@@ -4001,6 +4001,7 @@ button:disabled {
 	margin: 0;
 	font-size: 0.9rem;
 	color: var(--muted);
+	white-space: pre-line;
 }
 
 .confirm-prompt {
@@ -11159,4 +11160,54 @@ small {
 		color: inherit !important;
 		text-decoration: none !important;
 	}
+}
+
+/* Row selection (EntityTable `selectedIds` / `onSelectionChange`) + bulk actions */
+.table-select-head,
+.table-select-cell {
+	width: 1%;
+	min-width: 2rem;
+	padding-right: 0.2rem;
+	text-align: center;
+	white-space: nowrap;
+}
+
+.table-select-checkbox {
+	width: 0.95rem;
+	height: 0.95rem;
+	margin: 0;
+	vertical-align: middle;
+	cursor: pointer;
+	accent-color: var(--accent);
+}
+
+.table-select-checkbox:disabled {
+	cursor: default;
+	opacity: 0.5;
+}
+
+.table-row-selected td {
+	background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.job-orders-bulk-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.job-orders-list-controls .job-orders-bulk-close {
+	border-color: #dc2626;
+	color: #b91c1c;
+}
+
+.job-orders-list-controls .job-orders-bulk-close:hover:not(:disabled) {
+	background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+	border-color: #b91c1c;
+	color: #ffffff;
+}
+
+.job-orders-list-controls .job-orders-bulk-clear {
+	padding-left: 0.42rem;
+	padding-right: 0.42rem;
 }
