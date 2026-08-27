@@ -5179,6 +5179,48 @@ button:disabled {
 	min-height: 60vh;
 }
 
+.quick-filter-bar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.38rem;
+	margin: 0.2rem 0 0.6rem;
+}
+
+.quick-filter-count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.35rem;
+	padding: 0 0.36rem;
+	border-radius: 999px;
+	border: 1px solid var(--ui-secondary-border);
+	background: var(--ui-secondary-bg);
+	color: var(--ui-secondary-ink);
+	font-size: 0.7rem;
+	font-weight: 700;
+	line-height: 1.3;
+}
+
+.quick-filter-button.active .quick-filter-count {
+	border-color: rgba(255, 255, 255, 0.45);
+	background: rgba(255, 255, 255, 0.18);
+	color: #ffffff;
+}
+
+.kanban-card-inline-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.28rem;
+	font-size: 0.72rem;
+	font-weight: 600;
+	color: var(--accent);
+}
+
+.kanban-card-inline-link svg {
+	width: 0.8rem;
+	height: 0.8rem;
+}
+
 .method-tabs {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));

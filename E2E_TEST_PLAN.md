@@ -494,7 +494,7 @@
 #### TC-JO-12 — Open the board and move a submission
 **Steps:**
 1. Open a job order that has at least two submissions in different stages
-2. Choose **Actions → Pipeline Board** (or the **Open the pipeline board** link above the submissions list)
+2. Click the board icon in the job-order header (also reachable via **Actions → Pipeline Board**, the **Open the pipeline board** link above the submissions list, or the board icon on the row in `/job-orders`)
 3. Drag a **Submitted** card onto **Qualified**
 4. Go back to the job order → Submissions tab
 
@@ -519,6 +519,19 @@
 3. (Optional) With another user, move the same submission out of the user's division scope, then drag it on the stale board
 
 **Expected:** Cancelling leaves the card in place with no request sent. Confirming moves it to **Rejected**. A refused move (404/409 from the server) snaps the card back to its previous column with an error toast.
+
+---
+
+### 4.5 Quick Filters
+
+#### TC-JO-15 — Published is the default and the last chip is remembered
+**Steps:**
+1. Have at least one job order that is Open + published, one Open + not published, one On Hold and one Closed
+2. Open `/job-orders` in a fresh browser profile
+3. Click **Closed**, then reload the page
+4. Click **All**, then use the search box and Advanced Search
+
+**Expected:** Step 2 shows only the Open + published job order with the **Published** chip active and each chip showing its count (Published 1, Open 2, On Hold 1, Closed 1, All 4). After step 3 the list reopens on **Closed**. Search and Advanced Search narrow within the active chip; switching chip clears any row selection. Saving a view while on **Closed** and later applying the system default view returns to **Published**.
 
 ---
 

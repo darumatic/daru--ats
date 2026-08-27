@@ -5,6 +5,8 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 ## [Unreleased]
 
 #### Added
+- The job-order list has quick-filter chips (`Published`, `Open`, `On Hold`, `Closed`, `All`) with match counts. `Published` means live on the careers site (flag on and status Open); the list starts there and remembers the last chip per browser, and saved views carry the chip.
+- The per-job `Pipeline Board` is now one click from the job-order list (board icon on each row, link on list Kanban cards) and from a board icon button in the job-order header.
 - Job orders now have a per-job `Pipeline Board` (`/job-orders/{id}/pipeline`, from `Actions > Pipeline Board` or the link above the submissions list): the job's submissions laid out as Kanban columns by stage, with drag-and-drop stage changes backed by a new status-only `PATCH /api/submissions/[id]/status` endpoint. Submissions with a placement are locked, `Placed` stays reserved for `Convert to Placement`, and dropping on `Rejected` asks for confirmation.
 
 #### Changed

@@ -51,7 +51,7 @@ Use workspace tabs for:
 Job order detail also includes a unified `Timeline` workspace tab that rolls up submissions, interviews, placements, client feedback, and client-portal lifecycle activity into one chronological feed.
 
 ## Pipeline Board
-Each job order has its own Kanban board at `/job-orders/{id}/pipeline`, opened from `Actions > Pipeline Board` or from the `Open the pipeline board` link above the submissions list. It is a separate page (not a workspace tab) because seven stage columns need the full width; open it in a new browser tab with a middle-click or Cmd/Ctrl-click like any other link.
+Each job order has its own Kanban board at `/job-orders/{id}/pipeline`. It opens from the board icon button in the job-order header, from `Actions > Pipeline Board`, from the `Open the pipeline board` link above the submissions list, and from the job-order list (the board icon on each row, or the `Pipeline Board` link on a list Kanban card). It is a separate page (not a workspace tab) because seven stage columns need the full width; open it in a new browser tab with a middle-click or Cmd/Ctrl-click like any other link.
 
 - Columns are the submission stages in pipeline order: `Submitted`, `Under Review`, `Qualified`, `Offered`, `Hired`, `Placed`, `Rejected`. The same list drives the submission forms and the operational report.
 - Cards are that job's submissions, sorted by recruiter priority order within each column. A card shows the candidate (`Last, First`, linking to the candidate record), current title, who submitted it and whether it came from the career site, the candidate source, the latest client-portal update (only while the client portal is enabled), and the last update time. The arrow icon opens the submission record. Both links carry record navigation, so Previous/Next on the opened record walks the board.
@@ -107,6 +107,14 @@ Behavior:
 1. Keep internal and public descriptions distinct.
 2. Confirm hiring manager contact before first submission.
 3. Close job orders promptly when no longer active.
+
+## Quick Filters
+The job-order list has a row of quick-filter chips above the search box: `Published`, `Open`, `On Hold`, `Closed`, `All`, each showing how many job orders it would list.
+- `Published` means live on the careers site: career-site flag on AND status `Open`. This is narrower than the `Career Site` column / advanced-search value, which only look at the flag.
+- The status chips match the stored status; `All` clears the quick filter.
+- The list starts on `Published`. The last chip clicked is remembered per browser (like the List/Kanban toggle) and used on the next visit.
+- Saved views store the chip too, so applying a view (including the system default, which resets to `Published`) switches it. Views saved before quick filters existed carry none and leave the current chip alone.
+- The chip applies on top of the search box and advanced search, in both List and Kanban views, and changing it clears any row selection.
 
 ## List Search
 The job-order list keeps the basic search for fast lookups and adds a separate `Advanced Search` builder for structured criteria.

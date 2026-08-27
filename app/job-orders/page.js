@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Ban, Filter, LayoutGrid, LayoutList, Plus, X } from 'lucide-react';
+import { Ban, Filter, LayoutGrid, LayoutList, Plus, SquareKanban, X } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
 import JobOrderAdvancedSearchModal from '@/app/components/job-order-advanced-search-modal';
 import SavedListViews from '@/app/components/saved-list-views';
@@ -23,6 +23,17 @@ import { sortByConfig } from '@/lib/list-sort';
 import { saveRecordNavigationContext, withRecordNavigationQuery } from '@/lib/record-navigation-context';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { JOB_ORDER_STATUS_OPTIONS } from '@/lib/job-order-options';
+import {
+	countJobOrderQuickFilterMatches,
+	DEFAULT_JOB_ORDER_QUICK_FILTER,
+	formatJobOrderQuickFilterLabel,
+	isJobOrderQuickFilterValue,
+	JOB_ORDER_QUICK_FILTER_OPTIONS,
+	JOB_ORDER_QUICK_FILTER_STORAGE_KEY,
+	matchesJobOrderQuickFilter,
+	normalizeJobOrderQuickFilter,
+	resolveJobOrderQuickFilterFromViewState
+} from '@/lib/job-order-quick-filters';
 import { isPlaceholderClient } from '@/lib/default-client';
 import { buildDefaultTableSortState, normalizeTableSortState } from '@/lib/table-sort';
 
@@ -60,6 +71,7 @@ export default function JobOrdersPage() {
 	const [advancedCriteria, setAdvancedCriteria] = useState([]);
 	const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
 	const [viewMode, setViewMode] = useState('list');
+	const [quickFilter, setQuickFilter] = useState(DEFAULT_JOB_ORDER_QUICK_FILTER);
 	const [sortState, setSortState] = useState({ key: '', direction: 'asc' });
 	const [movingRowIds, setMovingRowIds] = useState(new Set());
 	const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -90,9 +102,12 @@ export default function JobOrdersPage() {
 		[advancedCriteria]
 	);
 
+	const quickFilterCounts = useMemo(() => countJobOrderQuickFilterMatches(activeRows), [activeRows]);
+
 	const quickFilteredRows = useMemo(() => {
 		const q = query.trim().toLowerCase();
 		return activeRows.filter((row) => {
+			if (!matchesJobOrderQuickFilter(row, quickFilter)) return false;
 			const matchesText =
 				!q ||
 				`${row.title} ${row.client} ${row.contact} ${row.owner ?? ''} ${row.location ?? ''} ${row.status} ${row.statusLabel}`
@@ -100,7 +115,7 @@ export default function JobOrdersPage() {
 					.includes(q);
 			return matchesText;
 		});
-	}, [activeRows, query]);
+	}, [activeRows, query, quickFilter]);
 
 	const filteredRows = useMemo(() => {
 		return quickFilteredRows.filter((row) => evaluateJobOrderAdvancedCriteria(row, normalizedAdvancedCriteria));
@@ -135,6 +150,10 @@ export default function JobOrdersPage() {
 			const stored = String(window.localStorage.getItem(VIEW_MODE_STORAGE_KEY) || '').trim();
 			if (stored === 'kanban' || stored === 'list') {
 				setViewMode(stored);
+			}
+			const storedQuickFilter = window.localStorage.getItem(JOB_ORDER_QUICK_FILTER_STORAGE_KEY);
+			if (isJobOrderQuickFilterValue(storedQuickFilter)) {
+				setQuickFilter(normalizeJobOrderQuickFilter(storedQuickFilter));
 			}
 		} catch {
 			// Ignore storage access errors.
@@ -189,13 +208,26 @@ export default function JobOrdersPage() {
 		}
 	}
 
+	function setNextQuickFilter(nextQuickFilter) {
+		const normalized = normalizeJobOrderQuickFilter(nextQuickFilter);
+		setQuickFilter(normalized);
+		setSelectedIds(new Set());
+		try {
+			window.localStorage.setItem(JOB_ORDER_QUICK_FILTER_STORAGE_KEY, normalized);
+		} catch {
+			// Ignore storage access errors.
+		}
+	}
+
 	function persistNavigationContext() {
 		const navigationRows = viewMode === 'kanban' ? kanbanRows : sortedListRows;
+		const isFiltered = query.trim() || normalizedAdvancedCriteria.length > 0;
 		saveRecordNavigationContext('job-order', {
 			ids: navigationRows.map((row) => row.id),
-			label:
-				query.trim() || normalizedAdvancedCriteria.length > 0
-					? 'Filtered Job Orders'
+			label: isFiltered
+				? 'Filtered Job Orders'
+				: quickFilter !== 'all'
+					? `${formatJobOrderQuickFilterLabel(quickFilter)} Job Orders`
 					: viewMode === 'kanban'
 						? 'Job Order Pipeline'
 						: 'Job Order List',
@@ -208,12 +240,17 @@ export default function JobOrdersPage() {
 		router.push(withRecordNavigationQuery(`/job-orders/${row.id}`));
 	}
 
+	function onOpenPipelineBoard(row) {
+		router.push(`/job-orders/${row.id}/pipeline`);
+	}
+
 	function applySavedViewState(nextState = {}) {
 		setQuery(String(nextState.query ?? ''));
 		setAdvancedCriteria(normalizeJobOrderAdvancedCriteria(nextState.advancedCriteria || []));
 		setSortState(normalizeTableSortState(nextState.sortState));
 		const nextViewMode = String(nextState.viewMode || 'list');
 		setNextViewMode(nextViewMode === 'kanban' ? 'kanban' : 'list');
+		setNextQuickFilter(resolveJobOrderQuickFilterFromViewState(nextState, quickFilter));
 	}
 
 	function removeAdvancedCriterion(indexToRemove) {
@@ -439,6 +476,24 @@ export default function JobOrdersPage() {
 						</button>
 					</div>
 				</div>
+				<div className="quick-filter-bar" role="group" aria-label="Job order quick filters">
+					{JOB_ORDER_QUICK_FILTER_OPTIONS.map((option) => {
+						const isActive = quickFilter === option.value;
+						return (
+							<button
+								key={option.value}
+								type="button"
+								className={`btn-secondary view-toggle-button quick-filter-button${isActive ? ' active' : ''}`}
+								onClick={() => setNextQuickFilter(option.value)}
+								aria-pressed={isActive}
+								title={option.description}
+							>
+								{option.label}
+								<span className="quick-filter-count">{quickFilterCounts[option.value] ?? 0}</span>
+							</button>
+						);
+					})}
+				</div>
 				<div className="list-controls job-orders-list-controls">
 					{advancedCriteriaSummary.length > 0 ? (
 						<div className="job-orders-search-token-field">
@@ -521,13 +576,15 @@ export default function JobOrdersPage() {
 									query: '',
 									advancedCriteria: [],
 									sortState: defaultSortState,
-									viewMode: 'list'
+									viewMode: 'list',
+									quickFilter: DEFAULT_JOB_ORDER_QUICK_FILTER
 								}}
 								currentState={{
 									query,
 									advancedCriteria: normalizedAdvancedCriteria,
 									sortState: effectiveSortState,
-									viewMode
+									viewMode,
+									quickFilter
 								}}
 								onApplyState={applySavedViewState}
 							/>
@@ -545,7 +602,10 @@ export default function JobOrdersPage() {
 						loadingLabel="Loading job orders"
 						sortState={sortState.key ? sortState : undefined}
 						onSortStateChange={setSortState}
-						rowActions={[{ label: 'Open', onClick: onOpen }]}
+						rowActions={[
+							{ label: 'Open', onClick: onOpen },
+							{ label: 'Pipeline Board', icon: SquareKanban, onClick: onOpenPipelineBoard }
+						]}
 						selectedIds={selectedIds}
 						onSelectionChange={setSelectedIds}
 					/>
@@ -568,6 +628,15 @@ export default function JobOrdersPage() {
 								<p className="kanban-card-meta">{row.client || '-'}</p>
 								<p className="kanban-card-meta">{row.owner || '-'}</p>
 								<p className="kanban-card-time">{row.lastActivityAtLabel}</p>
+								<Link
+									href={`/job-orders/${row.id}/pipeline`}
+									className="kanban-card-inline-link"
+									draggable={false}
+									title="Pipeline Board"
+								>
+									<SquareKanban aria-hidden="true" />
+									Pipeline Board
+								</Link>
 							</div>
 						)}
 					/>

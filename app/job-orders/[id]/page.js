@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowUpRight, ChevronLeft, ChevronRight, GripVertical, MoreVertical, Plus, RefreshCcw, Sparkles, Trash2, UserPlus } from 'lucide-react';
+import { ArrowUpRight, ChevronLeft, ChevronRight, GripVertical, MoreVertical, Plus, RefreshCcw, Sparkles, SquareKanban, Trash2, UserPlus } from 'lucide-react';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
@@ -1059,6 +1059,14 @@ export default function JobOrderDetailsPage() {
 							</div>
 						</div>
 					) : null}
+					<Link
+						href={`/job-orders/${id}/pipeline`}
+						className="btn-secondary btn-link-icon"
+						title="Pipeline Board"
+						aria-label="Pipeline Board"
+					>
+						<SquareKanban aria-hidden="true" className="btn-refresh-icon-svg" />
+					</Link>
 					<div className="actions-menu" ref={actionsMenuRef}>
 						<button
 							type="button"

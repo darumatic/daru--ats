@@ -41,6 +41,7 @@ When demo mode is enabled, authenticated demo users see a one-time welcome modal
 - Operational Reporting module with scoped KPIs, pipeline totals, drill-through detail, daily trend, owner performance, and Excel export with summary + entity tabs that mirror report-modal detail
 - List + Kanban pipeline views for Candidates and Job Orders with drag-and-drop status updates
 - Per-job pipeline board (`/job-orders/{id}/pipeline`) that shows one job's submissions as Kanban columns by stage, with drag-and-drop stage changes
+- Job-order list quick-filter chips (`Published`, `Open`, `On Hold`, `Closed`, `All`) with match counts; starts on `Published` (live on the careers site) and remembers the last chip per browser
 - Admin-defined custom fields for Candidates, Clients, Contacts, Job Orders, Submissions, Interviews, and Placements
 - AI-assisted resume parsing with fallback parsing if AI is unavailable
 - AI candidate summaries opened from a dedicated sparkles button on candidate detail, with first-run auto-generation from profile, resume, history, skills, and recent notes
