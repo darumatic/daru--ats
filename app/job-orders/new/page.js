@@ -1,9 +1,8 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
@@ -15,8 +14,6 @@ import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { JOB_ORDER_EMPLOYMENT_TYPES } from '@/lib/job-order-options';
 import { hasMeaningfulRichTextContent } from '@/lib/rich-text';
 import { formatCurrencyInput, parseCurrencyInput } from '@/lib/currency-input';
-import { fetchLookupOptionById } from '@/lib/lookup-client';
-import { fetchUnassignedDivisionOption } from '@/lib/default-division-client';
 import { toBooleanFlag } from '@/lib/boolean-flag';
 
 const JOB_ORDER_CURRENCIES = ['USD', 'CAD', 'AUD'];
@@ -39,8 +36,6 @@ const initialForm = {
 	salaryMin: '',
 	salaryMax: '',
 	publishToCareerSite: false,
-	divisionId: '',
-	ownerId: '',
 	clientId: '',
 	contactId: '',
 	customFields: {}
@@ -83,11 +78,9 @@ function NewJobOrdersPageContent() {
 		Number.isInteger(parsedPrefillContactId) && parsedPrefillContactId > 0
 			? String(parsedPrefillContactId)
 			: '';
-	const clientLocked = Boolean(presetClientId);
-	const contactLocked = clientLocked && Boolean(presetContactId);
-	const [actingUser, setActingUser] = useState(null);
-	const [selectedClientDivisionId, setSelectedClientDivisionId] = useState(null);
-	const [presetClientDivisionId, setPresetClientDivisionId] = useState(null);
+	// Client/contact are no longer form fields; a job started from a client or
+	// contact record still carries that relationship in the payload.
+	const contactLocked = Boolean(presetClientId && presetContactId);
 	const [careerSiteEnabled, setCareerSiteEnabled] = useState(false);
 	const [form, setForm] = useState(initialForm);
 	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
@@ -95,105 +88,22 @@ function NewJobOrdersPageContent() {
 	const [saving, setSaving] = useState(false);
 	const toast = useToast();
 	const { markAsClean } = useUnsavedChangesGuard(form);
-	const isAdmin = actingUser?.role === 'ADMINISTRATOR';
-
-	const ownerLookupParams = useMemo(
-		() =>
-			clientLocked && presetClientDivisionId
-				? { divisionId: String(presetClientDivisionId) }
-				: isAdmin && form.divisionId
-					? { divisionId: form.divisionId }
-					: {},
-		[clientLocked, form.divisionId, isAdmin, presetClientDivisionId]
-	);
-	const clientLookupParams = useMemo(
-		() =>
-			isAdmin && form.divisionId
-				? { divisionId: form.divisionId }
-				: {},
-		[form.divisionId, isAdmin]
-	);
-	const contactLookupParams = useMemo(() => {
-		const params = {};
-		if (form.clientId) {
-			params.clientId = form.clientId;
-		}
-		if (isAdmin && form.divisionId) {
-			params.divisionId = String(form.divisionId);
-		}
-		return params;
-	}, [form.clientId, form.divisionId, isAdmin]);
 
 	useEffect(() => {
 		let cancelled = false;
 
-		async function loadSessionUser() {
-			const [sessionRes, settingsRes] = await Promise.all([
-				fetch('/api/session/acting-user'),
-				fetch('/api/system-settings', { cache: 'no-store' })
-			]);
-				const sessionData = await sessionRes.json().catch(() => ({ user: null }));
-				const settingsData = await settingsRes.json().catch(() => ({}));
-				if (cancelled) return;
-				setActingUser(sessionData?.user || null);
-				setCareerSiteEnabled(toBooleanFlag(settingsData?.careerSiteEnabled, false));
+		async function loadSystemSettings() {
+			const settingsRes = await fetch('/api/system-settings', { cache: 'no-store' });
+			const settingsData = await settingsRes.json().catch(() => ({}));
+			if (cancelled) return;
+			setCareerSiteEnabled(toBooleanFlag(settingsData?.careerSiteEnabled, false));
 		}
 
-		loadSessionUser();
+		loadSystemSettings();
 		return () => {
 			cancelled = true;
 		};
 	}, []);
-
-	useEffect(() => {
-		let active = true;
-		if (!actingUser || clientLocked) {
-			return () => {
-				active = false;
-			};
-		}
-
-		if (actingUser.role === 'ADMINISTRATOR') {
-			fetchUnassignedDivisionOption()
-				.then((option) => {
-					if (!active) return;
-					const unassignedDivisionId = option?.value ? String(option.value) : '';
-					if (!unassignedDivisionId) return;
-					setForm((current) => {
-						if (current.divisionId) return current;
-						const nextForm = {
-							...current,
-							divisionId: unassignedDivisionId
-						};
-						markAsClean(nextForm);
-						return nextForm;
-					});
-				})
-				.catch(() => null);
-			return () => {
-				active = false;
-			};
-		}
-
-		const userDivisionId = actingUser?.divisionId ? String(actingUser.divisionId) : '';
-		if (!userDivisionId) {
-			return () => {
-				active = false;
-			};
-		}
-		setForm((current) => {
-			const nextForm = {
-				...current,
-				divisionId: userDivisionId
-			};
-			markAsClean(nextForm);
-			return nextForm;
-		});
-
-		return () => {
-			active = false;
-		};
-	}, [actingUser, clientLocked]);
 
 	useEffect(() => {
 		const nextForm = {
@@ -209,118 +119,6 @@ function NewJobOrdersPageContent() {
 		});
 		setError('');
 	}, [contactLocked, presetClientId, presetContactId, markAsClean]);
-
-	useEffect(() => {
-		let active = true;
-		if (!clientLocked || !presetClientId) {
-			setPresetClientDivisionId(null);
-			return () => {
-				active = false;
-			};
-		}
-
-		fetchLookupOptionById('clients', presetClientId, {})
-			.then((option) => {
-				if (!active) return;
-				setPresetClientDivisionId(option?.divisionId ?? null);
-				setSelectedClientDivisionId(option?.divisionId ?? null);
-				if (option?.divisionId) {
-					setForm((current) => {
-						const nextForm = {
-							...current,
-							divisionId: String(option.divisionId)
-						};
-						markAsClean(nextForm);
-						return nextForm;
-					});
-				}
-			})
-			.catch(() => {
-				if (!active) return;
-				setPresetClientDivisionId(null);
-			});
-
-		return () => {
-			active = false;
-		};
-	}, [clientLocked, presetClientId]);
-
-	useEffect(() => {
-		let active = true;
-		if (!form.clientId) {
-			setSelectedClientDivisionId(clientLocked ? presetClientDivisionId : null);
-			return () => {
-				active = false;
-			};
-		}
-
-		fetchLookupOptionById('clients', form.clientId, {})
-			.then((option) => {
-				if (!active) return;
-				setSelectedClientDivisionId(option?.divisionId ?? null);
-			})
-			.catch(() => {
-				if (!active) return;
-				setSelectedClientDivisionId(null);
-			});
-
-		return () => {
-			active = false;
-		};
-	}, [clientLocked, form.clientId, presetClientDivisionId]);
-
-	useEffect(() => {
-		if (isAdmin && !form.divisionId) {
-			setForm((f) => {
-				if (clientLocked) return f;
-				const nextOwnerId = '';
-				const nextClientId = '';
-				const nextContactId = '';
-				if (
-					f.ownerId === nextOwnerId &&
-					f.clientId === nextClientId &&
-					f.contactId === nextContactId
-				) {
-					return f;
-				}
-				return {
-					...f,
-					ownerId: nextOwnerId,
-					clientId: nextClientId,
-					contactId: nextContactId
-				};
-			});
-			return;
-		}
-
-		if (isAdmin && form.clientId && form.divisionId && selectedClientDivisionId != null) {
-			if (Number(form.divisionId) === Number(selectedClientDivisionId)) return;
-			setForm((f) => {
-				const nextOwnerId = clientLocked ? f.ownerId : '';
-				const nextClientId = clientLocked ? f.clientId : '';
-				const nextContactId = contactLocked ? f.contactId : '';
-				if (
-					f.ownerId === nextOwnerId &&
-					f.clientId === nextClientId &&
-					f.contactId === nextContactId
-				) {
-					return f;
-				}
-				return {
-					...f,
-					ownerId: nextOwnerId,
-					clientId: nextClientId,
-					contactId: nextContactId
-				};
-			});
-		}
-	}, [clientLocked, contactLocked, form.clientId, form.divisionId, isAdmin, selectedClientDivisionId]);
-
-	useEffect(() => {
-		if (!form.clientId && !contactLocked) {
-			setForm((f) => (f.contactId ? { ...f, contactId: '' } : f));
-		}
-	}, [contactLocked, form.clientId]);
 
 	useEffect(() => {
 		if (error) {
@@ -353,10 +151,6 @@ function NewJobOrdersPageContent() {
 	const canSave =
 		form.title.trim().length > 0 &&
 		Boolean(form.status) &&
-		Boolean(form.ownerId) &&
-		Boolean(form.clientId) &&
-		Boolean(form.contactId) &&
-		(!isAdmin || Boolean(form.divisionId)) &&
 		Boolean(form.zipCode.trim()) &&
 		!hasSalaryRangeError &&
 		customFieldsComplete &&
@@ -366,24 +160,8 @@ function NewJobOrdersPageContent() {
 	async function onManualSubmit(e) {
 		e.preventDefault();
 		setError('');
-		if (isAdmin && !form.divisionId) {
-			setError('Division is required.');
-			return;
-		}
-		if (!form.ownerId) {
-			setError('Owner is required.');
-			return;
-		}
 		if (!form.status) {
 			setError('Status is required.');
-			return;
-		}
-		if (!form.clientId) {
-			setError('Client is required.');
-			return;
-		}
-		if (!form.contactId) {
-			setError('Hiring Manager is required.');
 			return;
 		}
 		if (!form.zipCode.trim()) {
@@ -586,87 +364,6 @@ function NewJobOrdersPageContent() {
 								</span>
 							</div>
 						) : null}
-						{isAdmin ? (
-							<FormField label="Division" required>
-								<LookupTypeaheadSelect
-									entity="divisions"
-									lookupParams={{}}
-									value={form.divisionId}
-									onChange={(nextValue) =>
-										setForm((f) => ({
-											...f,
-											divisionId: nextValue,
-											ownerId: clientLocked ? f.ownerId : '',
-											clientId: clientLocked ? f.clientId : '',
-											contactId: contactLocked ? f.contactId : ''
-										}))
-									}
-									placeholder={clientLocked ? 'Division locked by client' : 'Search division'}
-									label="Division"
-									disabled={clientLocked}
-									emptyLabel="No matching divisions."
-								/>
-							</FormField>
-						) : null}
-							<FormField label="Owner" required>
-								<LookupTypeaheadSelect
-									entity="users"
-									lookupParams={ownerLookupParams}
-									value={form.ownerId}
-									onChange={(nextValue) => setForm((f) => ({ ...f, ownerId: nextValue }))}
-									placeholder={isAdmin && !form.divisionId ? 'Select division first' : 'Search owner (required)'}
-									label="Owner"
-									disabled={isAdmin && !form.divisionId}
-									emptyLabel="No matching users."
-								/>
-							</FormField>
-						<FormField label="Client" required>
-							<LookupTypeaheadSelect
-								entity="clients"
-								lookupParams={clientLookupParams}
-								value={form.clientId}
-								onChange={(nextValue) =>
-									setForm((f) => ({
-										...f,
-										clientId: nextValue,
-										contactId: contactLocked ? f.contactId : ''
-									}))
-								}
-								onSelectOption={(option) => setSelectedClientDivisionId(option?.divisionId ?? null)}
-								placeholder={
-									isAdmin && !form.divisionId
-										? 'Select division first'
-										: form.ownerId
-											? 'Search client'
-											: 'Select owner first'
-								}
-								label="Client"
-								emptyLabel="No matching clients."
-								disabled={clientLocked || (isAdmin ? !form.divisionId : !form.ownerId)}
-							/>
-						</FormField>
-						<FormField label="Hiring Manager" required>
-							<LookupTypeaheadSelect
-								entity="contacts"
-								lookupParams={contactLookupParams}
-								value={form.contactId}
-								onChange={(nextValue) => setForm((f) => ({ ...f, contactId: nextValue }))}
-								placeholder={
-									contactLocked
-										? 'Hiring manager locked from source contact'
-										: (isAdmin && !form.divisionId)
-											? 'Select division first'
-											: form.ownerId
-											? form.clientId
-												? 'Search hiring manager'
-												: 'Select client first'
-											: 'Select owner first'
-								}
-								label="Hiring Manager"
-								disabled={contactLocked || (isAdmin ? !form.divisionId : !form.ownerId) || !form.clientId}
-								emptyLabel="No matching contacts."
-							/>
-						</FormField>
 							{careerSiteEnabled ? (
 								<>
 									<div className="checkbox-grid">
@@ -728,18 +425,17 @@ function NewJobOrdersPageContent() {
 				title="Job Order Setup"
 				intro="This record drives matching, submissions, interviews, the client portal, and public job publishing when enabled."
 				checklist={[
-					'Set the correct owner, client, hiring manager, status, and employment type before saving.',
+					'Set the status and employment type before saving.',
 					'Use a real ZIP code and location so search and matching stay credible.',
 					'If you plan to publish publicly, finish the public description before turning that on.'
 				]}
 				outcomes={[
 					'The job opens directly into matching, submissions, and client portal workflows.',
 					'Open job orders can be matched against candidates immediately after save.',
-					'The assigned contact can later receive a persistent client review portal link for this job.'
+					'A job started from a client contact can later receive a persistent client review portal link.'
 				]}
 				tips={[
-					'Keep internal description for recruiter context and public description for candidate-facing copy.',
-					'Pick the right hiring manager now because the portal and downstream client workflow hang off that relationship.'
+					'Keep internal description for recruiter context and public description for candidate-facing copy.'
 				]}
 			/>
 			</div>

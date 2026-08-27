@@ -134,3 +134,20 @@ describe('toTeaser', () => {
 		expect(toTeaser('')).toBe('');
 	});
 });
+
+describe('placeholder "Unassigned" client never reaches the public careers site', () => {
+	const placeholderJob = { ...BASE_JOB, client: { name: 'Unassigned', industry: null, website: null } };
+
+	it('normalizeListJob reports no client', () => {
+		expect(normalizeListJob(placeholderJob).client).toBeNull();
+	});
+
+	it('normalizeDetailJob reports no client', () => {
+		expect(normalizeDetailJob(placeholderJob).client).toBeNull();
+	});
+
+	it('real clients are still exposed with their public fields only', () => {
+		expect(normalizeDetailJob(BASE_JOB).client).toEqual({ name: 'Acme Corp', industry: 'Tech', website: 'https://acme.com' });
+		expect(normalizeListJob(BASE_JOB).client).toEqual({ name: 'Acme Corp', industry: 'Tech' });
+	});
+});

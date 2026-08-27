@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { jobOrderSchema } from '@/lib/validators';
+import { resolveJobOrderAssignmentUpdate } from '@/lib/job-order-defaults';
 import { normalizeJobOrderData } from '@/lib/normalizers';
 import { withInferredCityStateFromZip } from '@/lib/zip-code-lookup';
 import {
@@ -228,9 +229,6 @@ async function patchJob_orders_idHandler(req, { params }) {
 				{ status: 400 }
 			);
 		}
-		if (actingUser?.role === 'ADMINISTRATOR' && !parsed.data.divisionId) {
-			return NextResponse.json({ error: 'Division is required for administrators.' }, { status: 400 });
-		}
 		const existingCustomFields =
 			existing?.customFields && typeof existing.customFields === 'object' && !Array.isArray(existing.customFields)
 				? existing.customFields
@@ -267,26 +265,44 @@ async function patchJob_orders_idHandler(req, { params }) {
 				{ status: 400 }
 			);
 		}
-		const clientDivisionId = await validateClientAndContactDivision(
-			normalized.clientId,
-			normalized.contactId,
-			null
-		);
-		const ownership = await resolveOwnershipForWrite({
-			actingUser,
-			ownerIdInput: normalized.ownerId,
-			divisionIdInput: clientDivisionId
-		});
-		if (ownership.divisionId !== clientDivisionId) {
-			throw new AccessControlError('Owner must belong to the same division as the selected client.', 400);
+		// Client, hiring manager and owner are hidden from the edit form. Missing
+		// values keep what is stored, and an unchanged assignment set is written
+		// back verbatim without re-validation so legacy rows whose owner/client
+		// drifted between divisions stay editable.
+		const assignment = resolveJobOrderAssignmentUpdate(normalized, existing);
+		let assignmentData = {
+			clientId: assignment.clientId,
+			contactId: assignment.contactId,
+			ownerId: assignment.ownerId,
+			divisionId: assignment.divisionId
+		};
+		if (assignment.changed) {
+			const clientDivisionId = await validateClientAndContactDivision(
+				assignment.clientId,
+				assignment.contactId,
+				null
+			);
+			const ownership = await resolveOwnershipForWrite({
+				actingUser,
+				ownerIdInput: assignment.ownerId,
+				divisionIdInput: clientDivisionId
+			});
+			if (ownership.divisionId !== clientDivisionId) {
+				throw new AccessControlError('Owner must belong to the same division as the selected client.', 400);
+			}
+			assignmentData = {
+				clientId: assignment.clientId,
+				contactId: assignment.contactId,
+				ownerId: ownership.ownerId,
+				divisionId: clientDivisionId
+			};
 		}
 
 		const jobOrder = await prisma.jobOrder.update({
 			where: { id },
 			data: {
 				...normalized,
-				ownerId: ownership.ownerId,
-				divisionId: clientDivisionId
+				...assignmentData
 			},
 			include: {
 				client: true,

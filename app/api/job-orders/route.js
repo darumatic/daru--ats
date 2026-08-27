@@ -12,6 +12,8 @@ import {
 } from '@/lib/access-control';
 import { logCreate } from '@/lib/audit-log';
 import { ensureDefaultUnassignedDivision } from '@/lib/default-division';
+import { ensureDefaultUnassignedClient } from '@/lib/default-client';
+import { resolveDefaultJobOrderOwnerId, resolveJobOrderTargetDivisionId } from '@/lib/job-order-defaults';
 import { getSystemSettingRecord } from '@/lib/system-settings';
 import { parseJsonBody, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
@@ -182,13 +184,20 @@ async function postJob_ordersHandler(req) {
 		if (!parsed.success) {
 			return NextResponse.json({ errors: parsed.error.flatten() }, { status: 400 });
 		}
-		const defaultDivisionForAdmin =
-			actingUser?.role === 'ADMINISTRATOR' && !parsed.data.divisionId
-				? await ensureDefaultUnassignedDivision(prisma)
-				: null;
-		const jobOrderInput = defaultDivisionForAdmin
-			? { ...parsed.data, divisionId: defaultDivisionForAdmin.id }
-			: parsed.data;
+		// The form no longer asks for a division: administrators fall back to their
+		// own division, then to the shared "Unassigned" division; other roles are
+		// pinned to their own division by resolveOwnershipForWrite.
+		let targetDivisionId = resolveJobOrderTargetDivisionId({
+			actingUser,
+			divisionIdInput: parsed.data.divisionId
+		});
+		if (!targetDivisionId && actingUser?.role === 'ADMINISTRATOR') {
+			targetDivisionId = (await ensureDefaultUnassignedDivision(prisma)).id;
+		}
+		if (!targetDivisionId) {
+			throw new AccessControlError('Your user account is not assigned to a division.', 403);
+		}
+		const jobOrderInput = { ...parsed.data, divisionId: targetDivisionId };
 		const customFieldValidation = await validateAndNormalizeCustomFieldValues({
 			prisma,
 			moduleKey: 'jobOrders',
@@ -215,14 +224,19 @@ async function postJob_ordersHandler(req) {
 				{ status: 400 }
 			);
 		}
+		// Client and hiring manager are hidden from the form: a job created without a
+		// client is filed under the division's "Unassigned" placeholder client.
+		const clientId =
+			normalized.clientId ?? (await ensureDefaultUnassignedClient(prisma, targetDivisionId)).id;
 		const clientDivisionId = await validateClientAndContactDivision(
-			normalized.clientId,
+			clientId,
 			normalized.contactId,
 			normalized.divisionId
 		);
 		const ownership = await resolveOwnershipForWrite({
 			actingUser,
-			ownerIdInput: normalized.ownerId,
+			ownerIdInput:
+				normalized.ownerId ?? resolveDefaultJobOrderOwnerId({ actingUser, divisionId: clientDivisionId }),
 			divisionIdInput: clientDivisionId
 		});
 		if (ownership.divisionId !== clientDivisionId) {
@@ -232,6 +246,7 @@ async function postJob_ordersHandler(req) {
 			const jobOrder = await prisma.jobOrder.create({
 			data: {
 				...normalized,
+				clientId,
 				ownerId: ownership.ownerId,
 				divisionId: clientDivisionId
 			},

@@ -23,6 +23,7 @@ import { sortByConfig } from '@/lib/list-sort';
 import { saveRecordNavigationContext, withRecordNavigationQuery } from '@/lib/record-navigation-context';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { JOB_ORDER_STATUS_OPTIONS } from '@/lib/job-order-options';
+import { isPlaceholderClient } from '@/lib/default-client';
 import { buildDefaultTableSortState, normalizeTableSortState } from '@/lib/table-sort';
 
 const VIEW_MODE_STORAGE_KEY = 'job-orders-list-view-mode';
@@ -136,10 +137,11 @@ export default function JobOrdersPage() {
 			setRows(
 				data.map((job) => {
 					const lastActivityAt = job.lastActivityAt || job.updatedAt || job.createdAt || null;
+					const client = isPlaceholderClient(job.client) ? null : job.client;
 					return {
 						...job,
-						client: job.client?.name || '-',
-						clientId: job.client?.id || null,
+						client: client?.name || '-',
+						clientId: client?.id || null,
 						contact: job.contact ? `${job.contact.firstName} ${job.contact.lastName}` : '-',
 						statusLabel: formatSelectValueLabel(job.status),
 						locationLabel: formatLocation(job.location, job.city, job.state),
@@ -271,6 +273,7 @@ export default function JobOrdersPage() {
 		{
 			key: 'client',
 			label: 'Client',
+			defaultVisible: false,
 			render: (row) =>
 				row.clientId ? (
 					<TableEntityLink href={`/clients/${row.clientId}`}>{row.client}</TableEntityLink>
@@ -288,7 +291,7 @@ export default function JobOrdersPage() {
 			label: 'Submissions'
 		},
 		{ key: 'clientFeedbackCount', label: 'Client Feedback', defaultVisible: false },
-		{ key: 'owner', label: 'Owner' },
+		{ key: 'owner', label: 'Owner', defaultVisible: false },
 		{ key: 'contact', label: 'Contact', defaultVisible: false },
 		{ key: 'locationLabel', label: 'Location', defaultVisible: false },
 		{ key: 'employmentTypeLabel', label: 'Employment Type', defaultVisible: false },

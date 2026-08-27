@@ -5,13 +5,19 @@ Job Orders defines open hiring demand and serves as the center for submissions a
 
 ## Core Fields
 - Title
-- Owner (required)
 - Status (required)
-- Employment type (required)
-- Client
-- Hiring manager contact
-- Division
+- Employment type (required on edit)
+- Zip code (required)
 - Internal description (team-only)
+
+## Client, Hiring Manager, Owner And Division
+These are not asked for on the job-order forms; the team does not track them per role.
+- A job created without a client is filed under a per-division placeholder client named `Unassigned` (created on demand, one per division). The placeholder is hidden in the job-order list, in the job snapshot and on the public careers site (which falls back to its own no-client label).
+- Owner defaults to the user who creates the job when that user belongs to the job's division; otherwise it stays blank.
+- Hiring manager stays blank. Job orders started from a client or contact record (`Add Job Order` on those pages) still inherit that client and contact.
+- Division is derived from the client: an administrator's job lands in their own division (or `Unassigned` when they have none); other roles always use their own division.
+- Existing job orders keep their stored client, hiring manager, owner and division; saving a job order never re-validates or rewrites those unless an API caller changes them.
+- The list view keeps `Client` and `Owner` as optional columns (hidden by default).
 
 ## Compensation + Location
 Job orders include structured compensation and location details for operations and career-site publishing.

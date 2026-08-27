@@ -366,7 +366,7 @@
 #### TC-JO-01 — Create a new job order
 **Steps:**
 1. Navigate to `/job-orders/new`
-2. Fill Title, select Client, set Status to **Open**, select Employment Type
+2. Fill Title and Zip Code, set Status to **Open**, select Employment Type (no Client, Hiring Manager, Owner or Division fields are shown)
 3. Click **Save**
 
 **Expected:** Redirected to the new job order's detail page. Record appears in `/job-orders` list.
@@ -790,12 +790,12 @@
 
 ---
 
-### TC-CLI-03 — Hiring Manager lookup
+### TC-CLI-03 — Job order created from a contact keeps the hiring manager
 **Steps:**
-1. Open or create a job order
-2. In the Hiring Manager field, type "Daru"
+1. Open contact "Daru" and choose **Add Job Order**
+2. Fill Title and Zip Code, click **Save**
 
-**Expected:** Contact "Daru" appears in the lookup dropdown and can be selected.
+**Expected:** The job order detail Snapshot shows the client and "Daru" as Hiring Manager, even though neither field is shown on the form.
 
 ---
 

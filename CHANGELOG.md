@@ -5,6 +5,7 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 ## [Unreleased]
 
 #### Changed
+- Job orders no longer ask for Division, Owner, Client or Hiring Manager. New job orders are filed under a per-division `Unassigned` placeholder client (hidden from lists, snapshots and the public careers site), the owner defaults to the creating user, and existing job orders keep their stored assignments untouched when edited. The `Client` and `Owner` list columns are now hidden by default.
 - Candidate detail now includes a timeline-aware `Suggested Next Step` card in the snapshot area, with direct action links for likely recruiter follow-up.
 - Candidate names now display as `Last, First` in candidate-linked table/list views so sorting is more natural across candidates, submissions, interviews, placements, and job-order workspace lists.
 - Added a clean generic CSV migration-batch sample under `docs/import-samples/generic-migration-batch/` for importer testing and demo walkthroughs.

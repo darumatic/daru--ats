@@ -8,7 +8,7 @@ Use this sequence as your default process:
 
 1. Create or update a `Client`.
 2. Create or update a `Contact` for that client.
-3. Create a `Job Order` linked to the client and hiring manager contact.
+3. Create a `Job Order` (optionally from the client or contact record so it is linked to them).
 4. Add or import a `Candidate`.
 5. Create a `Submission` for candidate + job order.
 6. Share the `Client Review Portal` from the job order when you want external client feedback without requiring client login.
@@ -221,7 +221,7 @@ Primary purpose:
 
 Common actions:
 1. `Job Orders > New Job Order`
-2. Set required owner, status, client, and hiring manager contact.
+2. Set status and zip code (employment type is required when editing). Client, hiring manager, owner and division are not asked for; see `docs/modules/job-orders.md`.
 3. Add internal description.
 4. If career-site posting is enabled:
 - Toggle publish on

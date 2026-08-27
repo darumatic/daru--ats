@@ -41,8 +41,8 @@ import { sortByConfig } from '@/lib/list-sort';
 import { submissionCreatedByLabel, submissionOriginLabel } from '@/lib/submission-origin';
 import { getEffectiveSubmissionStatus } from '@/lib/submission-status';
 import { formatCurrencyInput, parseCurrencyInput } from '@/lib/currency-input';
-import { fetchLookupOptionById } from '@/lib/lookup-client';
 import { toBooleanFlag } from '@/lib/boolean-flag';
+import { displayClientName } from '@/lib/default-client';
 import { buildJobOrderTimeline } from '@/lib/activity-timeline';
 import { SUBMISSION_CANDIDATE_SOURCE_OPTIONS } from '@/lib/submission-candidate-source-options';
 
@@ -67,10 +67,6 @@ const initialForm = {
 	salaryMax: '',
 	publishToCareerSite: false,
 	applicationQuestions: [],
-	divisionId: '',
-	ownerId: '',
-	clientId: '',
-	contactId: '',
 	customFields: {}
 };
 
@@ -150,10 +146,6 @@ function toForm(row) {
 		salaryMax: row.salaryMax == null ? '' : formatCurrencyInput(String(row.salaryMax), currency),
 		publishToCareerSite: Boolean(row.publishToCareerSite),
 		applicationQuestions: Array.isArray(row.applicationQuestions) ? row.applicationQuestions : [],
-		divisionId: row.divisionId == null ? '' : String(row.divisionId),
-		ownerId: row.ownerId == null ? '' : String(row.ownerId),
-		clientId: String(row.clientId || ''),
-		contactId: row.contactId ? String(row.contactId) : '',
 		customFields:
 			row.customFields && typeof row.customFields === 'object' && !Array.isArray(row.customFields)
 				? row.customFields
@@ -195,8 +187,6 @@ export default function JobOrderDetailsPage() {
 	const [actingUser, setActingUser] = useState(null);
 	const [jobOrder, setJobOrder] = useState(null);
 	const [portalAccess, setPortalAccess] = useState(null);
-	const [ownerDivisionId, setOwnerDivisionId] = useState(null);
-	const [selectedClientDivisionId, setSelectedClientDivisionId] = useState(null);
 	const [careerSiteEnabled, setCareerSiteEnabled] = useState(false);
 	const [clientPortalEnabled, setClientPortalEnabled] = useState(true);
 	const [aiAvailable, setAiAvailable] = useState(false);
@@ -265,32 +255,6 @@ export default function JobOrderDetailsPage() {
 	}, [id, recordNavigationContext]);
 	const shouldUseRecordNavigation = searchParams.get(RECORD_NAVIGATION_QUERY_PARAM) === '1';
 
-	const selectedDivisionId = useMemo(() => {
-		if (isAdmin) return form.divisionId || '';
-		if (selectedClientDivisionId) return String(selectedClientDivisionId);
-		if (ownerDivisionId) return String(ownerDivisionId);
-		if (jobOrder?.divisionId) return String(jobOrder.divisionId);
-		return '';
-	}, [form.divisionId, isAdmin, jobOrder?.divisionId, ownerDivisionId, selectedClientDivisionId]);
-
-	const ownerLookupParams = useMemo(
-		() => (selectedDivisionId ? { divisionId: selectedDivisionId } : {}),
-		[selectedDivisionId]
-	);
-	const clientLookupParams = useMemo(
-		() => (selectedDivisionId ? { divisionId: selectedDivisionId } : {}),
-		[selectedDivisionId]
-	);
-	const contactLookupParams = useMemo(() => {
-		const params = {};
-		if (form.clientId) {
-			params.clientId = form.clientId;
-		}
-		if (selectedDivisionId) {
-			params.divisionId = selectedDivisionId;
-		}
-		return params;
-	}, [form.clientId, selectedDivisionId]);
 	const submissionCandidateLookupParams = useMemo(() => {
 		const params = {
 			excludeSubmittedJobOrderId: String(id)
@@ -407,8 +371,6 @@ export default function JobOrderDetailsPage() {
 		const nextForm = toForm(jobData);
 		setJobOrder(jobData);
 		setPortalAccess(portalData.access || null);
-		setOwnerDivisionId(jobData.ownerUser?.divisionId ?? null);
-		setSelectedClientDivisionId(jobData.client?.divisionId ?? null);
 		setForm(nextForm);
 		markAsClean(nextForm);
 		setSubmissionForm(initialSubmissionForm);
@@ -485,95 +447,6 @@ export default function JobOrderDetailsPage() {
 		if (!jobOrder?.id) return;
 		loadMatches({ keepResults: false });
 	}, [jobOrder?.id]);
-
-	useEffect(() => {
-		let active = true;
-		if (!form.ownerId) {
-			setOwnerDivisionId(null);
-			return () => {
-				active = false;
-			};
-		}
-
-		fetchLookupOptionById('users', form.ownerId, {})
-			.then((option) => {
-				if (!active) return;
-				setOwnerDivisionId(option?.divisionId ?? null);
-			})
-			.catch(() => {
-				if (!active) return;
-				setOwnerDivisionId(null);
-			});
-
-		return () => {
-			active = false;
-		};
-	}, [form.ownerId]);
-
-	useEffect(() => {
-		let active = true;
-		if (!form.clientId) {
-			setSelectedClientDivisionId(null);
-			return () => {
-				active = false;
-			};
-		}
-
-		fetchLookupOptionById('clients', form.clientId, {})
-			.then((option) => {
-				if (!active) return;
-				setSelectedClientDivisionId(option?.divisionId ?? null);
-			})
-			.catch(() => {
-				if (!active) return;
-				setSelectedClientDivisionId(null);
-			});
-
-		return () => {
-			active = false;
-		};
-	}, [form.clientId]);
-
-	useEffect(() => {
-		if (
-			form.clientId &&
-			ownerDivisionId != null &&
-			selectedClientDivisionId != null &&
-			Number(ownerDivisionId) !== Number(selectedClientDivisionId)
-		) {
-			setForm((current) => ({ ...current, clientId: '', contactId: '' }));
-		}
-	}, [form.clientId, ownerDivisionId, selectedClientDivisionId]);
-
-	useEffect(() => {
-		if (!isAdmin) return;
-		if (!form.divisionId) {
-			setForm((current) => {
-				if (!current.ownerId && !current.clientId && !current.contactId) return current;
-				return {
-					...current,
-					ownerId: '',
-					clientId: '',
-					contactId: ''
-				};
-			});
-			return;
-		}
-		if (!form.clientId || selectedClientDivisionId == null) return;
-		if (Number(form.divisionId) === Number(selectedClientDivisionId)) return;
-		setForm((current) => ({
-			...current,
-			ownerId: '',
-			clientId: '',
-			contactId: ''
-		}));
-	}, [form.clientId, form.divisionId, isAdmin, selectedClientDivisionId]);
-
-	useEffect(() => {
-		if (!form.clientId) {
-			setForm((f) => (f.contactId ? { ...f, contactId: '' } : f));
-		}
-	}, [form.clientId]);
 
 	useEffect(() => {
 		if (!hasMeaningfulRichTextContent(form.publicDescription) && form.publishToCareerSite) {
@@ -669,28 +542,12 @@ export default function JobOrderDetailsPage() {
 		e.preventDefault();
 		const salaryMin = parseCurrencyInput(form.salaryMin);
 		const salaryMax = parseCurrencyInput(form.salaryMax);
-		if (isAdmin && !form.divisionId) {
-			setSaveState({ saving: false, error: 'Division is required.', success: '' });
-			return;
-		}
-		if (!form.clientId) {
-			setSaveState({ saving: false, error: 'Client is required.', success: '' });
-			return;
-		}
-		if (!form.ownerId) {
-			setSaveState({ saving: false, error: 'Owner is required.', success: '' });
-			return;
-		}
 		if (!form.status) {
 			setSaveState({ saving: false, error: 'Status is required.', success: '' });
 			return;
 		}
 		if (!form.employmentType) {
 			setSaveState({ saving: false, error: 'Employment Type is required.', success: '' });
-			return;
-		}
-		if (!form.contactId) {
-			setSaveState({ saving: false, error: 'Hiring Manager is required.', success: '' });
 			return;
 		}
 		if (!form.zipCode.trim()) {
@@ -962,8 +819,14 @@ export default function JobOrderDetailsPage() {
 			return;
 		}
 
+		const clientName = displayClientName(jobOrder.client);
 		const confirmed = await requestConfirm({
-			message: `Close this job order?\n\nTitle: ${jobOrder.title || '-'}\nClient: ${jobOrder.client?.name || '-'}`,
+			message: [
+				'Close this job order?',
+				'',
+				`Title: ${jobOrder.title || '-'}`,
+				...(clientName ? [`Client: ${clientName}`] : [])
+			].join('\n'),
 			confirmLabel: 'Close',
 			cancelLabel: 'Keep Open',
 			isDanger: true
@@ -1153,17 +1016,22 @@ export default function JobOrderDetailsPage() {
 	);
 	const canSaveJobOrder =
 		form.title.trim().length > 0 &&
-		(!isAdmin || Boolean(form.divisionId)) &&
 		Boolean(form.status) &&
 		Boolean(form.employmentType) &&
-		Boolean(form.ownerId) &&
-		Boolean(form.clientId) &&
-		Boolean(form.contactId) &&
 		Boolean(form.zipCode.trim()) &&
 		!hasSalaryRangeError &&
 		customFieldsComplete &&
 		(!requiresPublicDescription || hasPublicDescription) &&
 		!saveState.saving;
+	// Client, hiring manager and owner are no longer edited here; show them only
+	// when a record actually carries one (the "Unassigned" placeholder is hidden).
+	const snapshotClientName = displayClientName(jobOrder.client);
+	const hiringManagerName = jobOrder.contact
+		? formatPersonName(jobOrder.contact.firstName, jobOrder.contact.lastName)
+		: '';
+	const ownerName = jobOrder.ownerUser
+		? formatPersonName(jobOrder.ownerUser.firstName, jobOrder.ownerUser.lastName)
+		: '';
 
 	return (
 		<section className="module-page">
@@ -1177,7 +1045,7 @@ export default function JobOrderDetailsPage() {
 						&larr; Back
 					</Link>
 					<h2>{jobOrder.title}</h2>
-					<p>{jobOrder.client?.name || 'No client linked'}</p>
+					{snapshotClientName ? <p>{snapshotClientName}</p> : null}
 				</div>
 				<div className="module-header-actions">
 					{jobOrderNavigationState ? (
@@ -1305,42 +1173,42 @@ export default function JobOrderDetailsPage() {
 						<span>Record ID</span>
 						<strong>{jobOrder.recordId || '-'}</strong>
 					</p>
-					<p>
-						<span>Client</span>
-						<strong>
-							{jobOrder.client?.id ? (
-								<Link href={`/clients/${jobOrder.client.id}`}>
-									{jobOrder.client.name}{' '}
-									<ArrowUpRight aria-hidden="true" className="snapshot-link-icon" />
-								</Link>
-							) : (
-								jobOrder.client?.name || '-'
-							)}
-						</strong>
-					</p>
-					<p>
-						<span>Hiring Manager</span>
-						<strong>
-							{jobOrder.contact?.id ? (
-								<Link href={`/contacts/${jobOrder.contact.id}`}>
-									{`${jobOrder.contact.firstName} ${jobOrder.contact.lastName}`}{' '}
-									<ArrowUpRight aria-hidden="true" className="snapshot-link-icon" />
-								</Link>
-							) : jobOrder.contact ? (
-								`${jobOrder.contact.firstName} ${jobOrder.contact.lastName}`
-							) : (
-								'-'
-							)}
-						</strong>
-					</p>
-					<p>
-						<span>Owner</span>
-						<strong>
-							{jobOrder.ownerUser
-								? `${jobOrder.ownerUser.firstName} ${jobOrder.ownerUser.lastName}`
-								: '-'}
-						</strong>
-					</p>
+					{snapshotClientName ? (
+						<p>
+							<span>Client</span>
+							<strong>
+								{jobOrder.client?.id ? (
+									<Link href={`/clients/${jobOrder.client.id}`}>
+										{snapshotClientName}{' '}
+										<ArrowUpRight aria-hidden="true" className="snapshot-link-icon" />
+									</Link>
+								) : (
+									snapshotClientName
+								)}
+							</strong>
+						</p>
+					) : null}
+					{hiringManagerName ? (
+						<p>
+							<span>Hiring Manager</span>
+							<strong>
+								{jobOrder.contact?.id ? (
+									<Link href={`/contacts/${jobOrder.contact.id}`}>
+										{hiringManagerName}{' '}
+										<ArrowUpRight aria-hidden="true" className="snapshot-link-icon" />
+									</Link>
+								) : (
+									hiringManagerName
+								)}
+							</strong>
+						</p>
+					) : null}
+					{ownerName ? (
+						<p>
+							<span>Owner</span>
+							<strong>{ownerName}</strong>
+						</p>
+					) : null}
 				</div>
 				{clientPortalEnabled ? (
 					<div className="job-order-portal-analytics-card">
@@ -1551,203 +1419,134 @@ export default function JobOrderDetailsPage() {
 							) : null}
 						</section>
 
-						<section className="form-section">
-							<h4>Client Assignment</h4>
-							{isAdmin ? (
-								<FormField label="Division" required>
-									<LookupTypeaheadSelect
-										entity="divisions"
-										lookupParams={{}}
-										value={form.divisionId}
-										onChange={(nextValue) =>
-											setForm((f) => ({
-												...f,
-												divisionId: nextValue,
-												ownerId: '',
-												clientId: '',
-												contactId: ''
-											}))
-										}
-										placeholder="Search division"
-										label="Division"
-										emptyLabel="No matching divisions."
-									/>
-								</FormField>
-							) : null}
-								<FormField label="Owner" required>
-									<LookupTypeaheadSelect
-										entity="users"
-										lookupParams={ownerLookupParams}
-										value={form.ownerId}
-										onChange={(nextValue) => setForm((f) => ({ ...f, ownerId: nextValue }))}
-										onSelectOption={(option) => setOwnerDivisionId(option?.divisionId ?? null)}
-										placeholder={isAdmin && !form.divisionId ? 'Select division first' : 'Search owner (required)'}
-										label="Owner"
-										disabled={isAdmin && !form.divisionId}
-										emptyLabel="No matching users."
-									/>
-								</FormField>
-							<FormField label="Client" required>
-								<LookupTypeaheadSelect
-									entity="clients"
-									lookupParams={clientLookupParams}
-									value={form.clientId}
-									onChange={(nextValue) =>
-										setForm((f) => ({ ...f, clientId: nextValue, contactId: '' }))
-									}
-									onSelectOption={(option) => setSelectedClientDivisionId(option?.divisionId ?? null)}
-									placeholder={isAdmin && !form.divisionId ? 'Select division first' : 'Search client'}
-									label="Client"
-									disabled={isAdmin && !form.divisionId}
-									emptyLabel="No matching clients."
-								/>
-							</FormField>
-							<FormField label="Hiring Manager" required>
-								<LookupTypeaheadSelect
-									entity="contacts"
-									lookupParams={contactLookupParams}
-									value={form.contactId}
-									onChange={(nextValue) => setForm((f) => ({ ...f, contactId: nextValue }))}
-									placeholder={
-										isAdmin && !form.divisionId
-											? 'Select division first'
-											: form.clientId
-												? 'Search hiring manager'
-												: 'Select client first'
-									}
-									label="Hiring Manager"
-									disabled={!form.clientId || (isAdmin && !form.divisionId)}
-									emptyLabel="No matching contacts."
-								/>
-							</FormField>
 						{careerSiteEnabled ? (
-							<>
-								<div className="checkbox-grid">
-									<label className="switch-field">
+						<section className="form-section">
+							<h4>Career Site Publishing</h4>
+							<div className="checkbox-grid">
+								<label className="switch-field">
+									<input
+										type="checkbox"
+										className="switch-input"
+										checked={form.publishToCareerSite}
+										disabled={!form.publishToCareerSite && !canPublishToCareerSite}
+										onChange={(e) => {
+											const checked = e.target.checked;
+											setForm((f) => ({ ...f, publishToCareerSite: checked }));
+											setSaveState((current) => ({ ...current, error: '' }));
+										}}
+									/>
+									<span className="switch-track" aria-hidden="true">
+										<span className="switch-thumb" />
+									</span>
+									<span className="switch-copy">
+										<span className="switch-label">Publish to Career Site</span>
+										<span className="switch-hint">
+											{canPublishToCareerSite
+												? 'Publish the public description to your careers page.'
+												: 'Add a public description before enabling career-site publishing.'}
+										</span>
+									</span>
+								</label>
+							</div>
+							<FormField label="Public Description" required={form.publishToCareerSite}>
+								<RichTextEditor
+									value={form.publicDescription}
+									onChange={(nextValue) => setForm((f) => ({ ...f, publicDescription: nextValue }))}
+									disabled={enhanceState.enhancing}
+									toolbarActions={[
+										{
+											key: 'enhance-public-posting',
+											label: 'Enhance public posting with AI',
+											loadingLabel: 'Enhancing...',
+											icon: Sparkles,
+											iconOnly: true,
+											title: aiAvailable
+												? 'Enhance with AI'
+												: 'Enable OpenAI in Admin Area > System Settings to use this.',
+											onClick: onEnhancePublicPosting,
+											disabled: !canEnhancePublicPosting,
+											loading: enhanceState.enhancing
+										}
+									]}
+									ariaLabel="Public Description"
+								/>
+							</FormField>
+							{!aiAvailable ? (
+								<p className="panel-subtext">Enable OpenAI in Admin Area &gt; System Settings to use this.</p>
+							) : null}
+							<FormField label="Application Questions">
+								<p className="panel-subtext" style={{ marginBottom: '0.5rem' }}>
+									Questions shown to candidates on the public apply form.
+								</p>
+								{form.applicationQuestions.map((q, index) => (
+									<div
+										key={q.id}
+										style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}
+									>
 										<input
-											type="checkbox"
-											className="switch-input"
-											checked={form.publishToCareerSite}
-											disabled={!form.publishToCareerSite && !canPublishToCareerSite}
+											style={{ flex: 1 }}
+											value={q.label}
+											placeholder="Question text"
 											onChange={(e) => {
-												const checked = e.target.checked;
-												setForm((f) => ({ ...f, publishToCareerSite: checked }));
-												setSaveState((current) => ({ ...current, error: '' }));
+												const label = e.target.value;
+												setForm((f) => ({
+													...f,
+													applicationQuestions: f.applicationQuestions.map((item, i) =>
+														i === index ? { ...item, label } : item
+													)
+												}));
 											}}
 										/>
-										<span className="switch-track" aria-hidden="true">
-											<span className="switch-thumb" />
-										</span>
-										<span className="switch-copy">
-											<span className="switch-label">Publish to Career Site</span>
-											<span className="switch-hint">
-												{canPublishToCareerSite
-													? 'Publish the public description to your careers page.'
-													: 'Add a public description before enabling career-site publishing.'}
-											</span>
-										</span>
-									</label>
-								</div>
-								<FormField label="Public Description" required={form.publishToCareerSite}>
-									<RichTextEditor
-										value={form.publicDescription}
-										onChange={(nextValue) => setForm((f) => ({ ...f, publicDescription: nextValue }))}
-										disabled={enhanceState.enhancing}
-										toolbarActions={[
-											{
-												key: 'enhance-public-posting',
-												label: 'Enhance public posting with AI',
-												loadingLabel: 'Enhancing...',
-												icon: Sparkles,
-												iconOnly: true,
-												title: aiAvailable
-													? 'Enhance with AI'
-													: 'Enable OpenAI in Admin Area > System Settings to use this.',
-												onClick: onEnhancePublicPosting,
-												disabled: !canEnhancePublicPosting,
-												loading: enhanceState.enhancing
-											}
-										]}
-										ariaLabel="Public Description"
-									/>
-								</FormField>
-								{!aiAvailable ? (
-									<p className="panel-subtext">Enable OpenAI in Admin Area &gt; System Settings to use this.</p>
-								) : null}
-								<FormField label="Application Questions">
-									<p className="panel-subtext" style={{ marginBottom: '0.5rem' }}>
-										Questions shown to candidates on the public apply form.
-									</p>
-									{form.applicationQuestions.map((q, index) => (
-										<div
-											key={q.id}
-											style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}
-										>
+										<label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', whiteSpace: 'nowrap' }}>
 											<input
-												style={{ flex: 1 }}
-												value={q.label}
-												placeholder="Question text"
+												type="checkbox"
+												checked={q.required}
 												onChange={(e) => {
-													const label = e.target.value;
+													const required = e.target.checked;
 													setForm((f) => ({
 														...f,
 														applicationQuestions: f.applicationQuestions.map((item, i) =>
-															i === index ? { ...item, label } : item
+															i === index ? { ...item, required } : item
 														)
 													}));
 												}}
 											/>
-											<label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', whiteSpace: 'nowrap' }}>
-												<input
-													type="checkbox"
-													checked={q.required}
-													onChange={(e) => {
-														const required = e.target.checked;
-														setForm((f) => ({
-															...f,
-															applicationQuestions: f.applicationQuestions.map((item, i) =>
-																i === index ? { ...item, required } : item
-															)
-														}));
-													}}
-												/>
-												Required
-											</label>
-											<button
-												type="button"
-												className="icon-button icon-button-danger"
-												title="Remove question"
-												onClick={() =>
-													setForm((f) => ({
-														...f,
-														applicationQuestions: f.applicationQuestions.filter((_, i) => i !== index)
-													}))
-												}
-											>
-												<Trash2 size={14} />
-											</button>
-										</div>
-									))}
-									<button
-										type="button"
-										className="button button-secondary button-sm"
-										onClick={() =>
-											setForm((f) => ({
-												...f,
-												applicationQuestions: [
-													...f.applicationQuestions,
-													{ id: crypto.randomUUID(), label: '', required: false }
-												]
-											}))
-										}
-									>
-										<Plus size={14} />
-										Add Question
-									</button>
-								</FormField>
-							</>
+											Required
+										</label>
+										<button
+											type="button"
+											className="icon-button icon-button-danger"
+											title="Remove question"
+											onClick={() =>
+												setForm((f) => ({
+													...f,
+													applicationQuestions: f.applicationQuestions.filter((_, i) => i !== index)
+												}))
+											}
+										>
+											<Trash2 size={14} />
+										</button>
+									</div>
+								))}
+								<button
+									type="button"
+									className="button button-secondary button-sm"
+									onClick={() =>
+										setForm((f) => ({
+											...f,
+											applicationQuestions: [
+												...f.applicationQuestions,
+												{ id: crypto.randomUUID(), label: '', required: false }
+											]
+										}))
+									}
+								>
+									<Plus size={14} />
+									Add Question
+								</button>
+							</FormField>
+						</section>
 						) : null}
-					</section>
 					<CustomFieldsSection
 						moduleKey="jobOrders"
 						values={form.customFields}
