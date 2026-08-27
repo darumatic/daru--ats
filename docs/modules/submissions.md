@@ -24,6 +24,13 @@ After creation:
 4. Advance status through review/interview steps.
 5. Convert to placement when accepted.
 
+## Stages
+Submission stages, in pipeline order: `Submitted`, `Under Review`, `Qualified`, `Offered`, `Hired`, `Placed`, `Rejected`. One shared list (`lib/submission-status.js`) drives the submission forms, the job-order pipeline board and the operational report.
+
+- The stage can be changed from the submission form, or by dragging the card on the job order's `Pipeline Board` (see the Job Orders module), which calls the status-only `PATCH /api/submissions/{id}/status`. Both are audit-logged; neither asks for a reason.
+- `Placed` is derived: a submission with an offer/placement always reads as `Placed` and is locked against edits and board moves. It is reached only through `Convert to Placement`, never by picking the status directly on the board.
+- Stage changes on a submission never alter the candidate's overall status.
+
 ## Actions Menu
 Key actions:
 - Schedule interview

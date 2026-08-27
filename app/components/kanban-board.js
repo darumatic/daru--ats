@@ -15,6 +15,7 @@ export default function KanbanBoard({
 	renderCard,
 	onMove,
 	movingRowIds,
+	isRowDraggable,
 	loading = false,
 	loadingLabel = 'Loading board',
 	emptyLabel = 'No records in this stage.'
@@ -115,12 +116,13 @@ export default function KanbanBoard({
 									const rowId = toIdString(getRowId(row));
 									const isMoving = movingIdSet.has(rowId);
 									const isDragging = draggingRowId && rowId === draggingRowId;
+									const isLocked = typeof isRowDraggable === 'function' && !isRowDraggable(row);
 									return (
 										<article
 											key={rowId}
 											role="listitem"
-											className={`kanban-card${isDragging ? ' is-dragging' : ''}${isMoving ? ' is-moving' : ''}`}
-											draggable={!isMoving}
+											className={`kanban-card${isDragging ? ' is-dragging' : ''}${isMoving ? ' is-moving' : ''}${isLocked ? ' is-locked' : ''}`}
+											draggable={!isMoving && !isLocked}
 											onDragStart={(event) => onCardDragStart(event, row, column.value)}
 											onDragEnd={onCardDragEnd}
 											data-source-column={column.value}

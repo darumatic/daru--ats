@@ -5130,6 +5130,55 @@ button:disabled {
 	line-height: 1.25;
 }
 
+.kanban-card-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.35rem;
+}
+
+.kanban-card-head .kanban-card-link {
+	flex: 1 1 auto;
+	min-width: 0;
+	width: auto;
+	overflow-wrap: anywhere;
+}
+
+.kanban-card-head .submission-open-link {
+	flex: 0 0 auto;
+	margin-top: -0.1rem;
+}
+
+.kanban-card-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.3rem;
+}
+
+.kanban-card-feedback {
+	color: var(--ink);
+}
+
+.kanban-card-locked {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.28rem;
+}
+
+.kanban-card-locked svg {
+	width: 0.8rem;
+	height: 0.8rem;
+}
+
+.kanban-card.is-locked {
+	cursor: default;
+	background: #f8fbff;
+}
+
+.job-order-pipeline-page .kanban-board {
+	min-height: 60vh;
+}
+
 .method-tabs {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));

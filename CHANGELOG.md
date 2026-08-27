@@ -4,7 +4,11 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 
 ## [Unreleased]
 
+#### Added
+- Job orders now have a per-job `Pipeline Board` (`/job-orders/{id}/pipeline`, from `Actions > Pipeline Board` or the link above the submissions list): the job's submissions laid out as Kanban columns by stage, with drag-and-drop stage changes backed by a new status-only `PATCH /api/submissions/[id]/status` endpoint. Submissions with a placement are locked, `Placed` stays reserved for `Convert to Placement`, and dropping on `Rejected` asks for confirmation.
+
 #### Changed
+- Submission stage options (`Submitted` … `Rejected`) now come from one shared list, so the submission forms, the pipeline board and the operational report agree on order and labels; `Rejected` is listed last in the forms.
 - Job-order list rows can now be selected (per row or per page) and closed together with `Close Selected`, backed by a new `PATCH /api/job-orders/bulk-status` endpoint that applies the same scope, audit and `closedAt` rules as closing a single job order.
 - Upgraded Next.js to 16.3.3, refreshed vulnerable transitive packages (brace-expansion, nanoid, js-yaml, postcss, sharp) to close the open Dependabot alerts, and pinned `deepmerge-ts` to 8.x via npm overrides for the Prisma CLI (`npm audit` is clean).
 - Job orders no longer ask for Division, Owner, Client or Hiring Manager. New job orders are filed under a per-division `Unassigned` placeholder client (hidden from lists, snapshots and the public careers site), the owner defaults to the creating user, and existing job orders keep their stored assignments untouched when edited. The `Client` and `Owner` list columns are now hidden by default.

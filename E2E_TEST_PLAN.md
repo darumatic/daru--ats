@@ -20,6 +20,7 @@
    - 4.1 Create & Edit
    - 4.2 Career Site Toggle & Custom Questions
    - 4.3 Status Lifecycle
+   - 4.4 Pipeline Board
 5. [Candidates](#5-candidates)
    - 5.1 Create & Edit
    - 5.2 Notes & Activities
@@ -485,6 +486,39 @@
 3. Set back to **Open**
 
 **Expected:** Job disappears from careers site while on hold; reappears when re-opened.
+
+---
+
+### 4.4 Pipeline Board
+
+#### TC-JO-12 — Open the board and move a submission
+**Steps:**
+1. Open a job order that has at least two submissions in different stages
+2. Choose **Actions → Pipeline Board** (or the **Open the pipeline board** link above the submissions list)
+3. Drag a **Submitted** card onto **Qualified**
+4. Go back to the job order → Submissions tab
+
+**Expected:** `/job-orders/{id}/pipeline` shows seven columns (Submitted, Under Review, Qualified, Offered, Hired, Placed, Rejected) with the correct counts. After the drop the card sits under **Qualified** with a success toast, the submission's status chip in the job-order list reads **Qualified**, and the submission's audit trail has an UPDATE entry with `status` before/after. Clicking the candidate name opens the candidate; the arrow icon opens the submission.
+
+---
+
+#### TC-JO-13 — Placed is reserved and placed submissions are locked
+**Steps:**
+1. On the board, drag a **Hired** card onto **Placed**
+2. Convert that submission to a placement from its detail page, then reopen the board
+3. Try to drag the now-placed card anywhere
+
+**Expected:** Step 1 shows an error toast pointing at Convert to Placement and the card stays put (`PATCH /api/submissions/{id}/status` answers 400). After conversion the card appears under **Placed** marked *Placement created* and cannot be dragged; a direct `PATCH … { "status": "qualified" }` answers 409.
+
+---
+
+#### TC-JO-14 — Rejecting asks for confirmation and a failed move rolls back
+**Steps:**
+1. Drag a card onto **Rejected** and cancel the confirmation
+2. Drag it again and confirm
+3. (Optional) With another user, move the same submission out of the user's division scope, then drag it on the stale board
+
+**Expected:** Cancelling leaves the card in place with no request sent. Confirming moves it to **Rejected**. A refused move (404/409 from the server) snaps the card back to its previous column with an error toast.
 
 ---
 

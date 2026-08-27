@@ -13,6 +13,7 @@ import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { fetchLookupOptionById } from '@/lib/lookup-client';
 import { formatCandidateStatusLabel, isCandidateQualifiedForPipeline } from '@/lib/candidate-status';
 import { SUBMISSION_CANDIDATE_SOURCE_OPTIONS } from '@/lib/submission-candidate-source-options';
+import { SUBMISSION_STATUS_OPTIONS } from '@/lib/submission-status';
 
 const initialForm = {
 	candidateId: '',
@@ -170,13 +171,11 @@ function NewSubmissionsPageContent() {
 							value={form.status}
 							onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
 						>
-							<option value="submitted">Submitted</option>
-							<option value="under_review">Under Review</option>
-							<option value="qualified">Qualified</option>
-							<option value="rejected">Rejected</option>
-							<option value="offered">Offered</option>
-							<option value="hired">Hired</option>
-							<option value="placed">Placed</option>
+							{SUBMISSION_STATUS_OPTIONS.map((option) => (
+								<option key={option.value} value={option.value}>
+									{option.label}
+								</option>
+							))}
 						</select>
 					</FormField>
 					<FormField label="Candidate Source">

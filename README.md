@@ -40,6 +40,7 @@ When demo mode is enabled, authenticated demo users see a one-time welcome modal
 - Action-oriented dashboard with KPI drill-through, 7-day activity strip, smart needs-attention alerts, upcoming interviews, recent candidates, recent job orders, and fixed-height section paging
 - Operational Reporting module with scoped KPIs, pipeline totals, drill-through detail, daily trend, owner performance, and Excel export with summary + entity tabs that mirror report-modal detail
 - List + Kanban pipeline views for Candidates and Job Orders with drag-and-drop status updates
+- Per-job pipeline board (`/job-orders/{id}/pipeline`) that shows one job's submissions as Kanban columns by stage, with drag-and-drop stage changes
 - Admin-defined custom fields for Candidates, Clients, Contacts, Job Orders, Submissions, Interviews, and Placements
 - AI-assisted resume parsing with fallback parsing if AI is unavailable
 - AI candidate summaries opened from a dedicated sparkles button on candidate detail, with first-run auto-generation from profile, resume, history, skills, and recent notes
@@ -447,6 +448,7 @@ Sample generic migration batch:
 Kanban status update endpoints:
 - `PATCH /api/candidates/[id]/status` with `{ "status": "...", "reason": "..." }`
 - `PATCH /api/job-orders/[id]/status` with `{ "status": "open|on_hold|closed" }`
+- `PATCH /api/submissions/[id]/status` with `{ "status": "submitted|under_review|qualified|offered|hired|rejected" }` (status-only; `placed` is refused — placements come from `Convert to Placement` — and a submission that already has an offer answers 409)
 
 Hire Gnome export/import coverage:
 - Export includes `customFieldDefinitions`, core entities, and related child records.

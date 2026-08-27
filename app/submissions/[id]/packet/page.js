@@ -7,19 +7,7 @@ import { ArrowUpRight, BriefcaseBusiness, Download, Printer, UserRound } from 'l
 import LoadingIndicator from '@/app/components/loading-indicator';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { submissionCreatedByLabel, submissionOriginLabel } from '@/lib/submission-origin';
-import { getEffectiveSubmissionStatus } from '@/lib/submission-status';
-
-function formatSubmissionStatusLabel(value) {
-	const normalized = String(value || '').trim().toLowerCase();
-	if (normalized === 'under_review') return 'Under Review';
-	if (normalized === 'submitted') return 'Submitted';
-	if (normalized === 'qualified') return 'Qualified';
-	if (normalized === 'rejected') return 'Rejected';
-	if (normalized === 'offered') return 'Offered';
-	if (normalized === 'hired') return 'Hired';
-	if (normalized === 'placed') return 'Placed';
-	return normalized ? normalized.replaceAll('_', ' ').replace(/\b\w/g, (match) => match.toUpperCase()) : '-';
-}
+import { formatSubmissionStatusLabel, getEffectiveSubmissionStatus } from '@/lib/submission-status';
 
 function formatInterviewStatusLabel(value) {
 	const normalized = String(value || '').trim().toLowerCase();

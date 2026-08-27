@@ -50,6 +50,16 @@ Use workspace tabs for:
 
 Job order detail also includes a unified `Timeline` workspace tab that rolls up submissions, interviews, placements, client feedback, and client-portal lifecycle activity into one chronological feed.
 
+## Pipeline Board
+Each job order has its own Kanban board at `/job-orders/{id}/pipeline`, opened from `Actions > Pipeline Board` or from the `Open the pipeline board` link above the submissions list. It is a separate page (not a workspace tab) because seven stage columns need the full width; open it in a new browser tab with a middle-click or Cmd/Ctrl-click like any other link.
+
+- Columns are the submission stages in pipeline order: `Submitted`, `Under Review`, `Qualified`, `Offered`, `Hired`, `Placed`, `Rejected`. The same list drives the submission forms and the operational report.
+- Cards are that job's submissions, sorted by recruiter priority order within each column. A card shows the candidate (`Last, First`, linking to the candidate record), current title, who submitted it and whether it came from the career site, the candidate source, the latest client-portal update (only while the client portal is enabled), and the last update time. The arrow icon opens the submission record. Both links carry record navigation, so Previous/Next on the opened record walks the board.
+- Drag a card to another column to change its stage. The move is optimistic, calls `PATCH /api/submissions/{id}/status` with just `{ "status" }`, and rolls back with an error toast if the server refuses. Dropping on `Rejected` asks for confirmation first. No reason is captured (unlike candidate stage moves); the change is audit-logged like any submission edit.
+- A submission that already has an offer/placement is shown in `Placed`, marked `Placement created`, and cannot be dragged: it is locked, exactly as its edit form is.
+- `Placed` is not a drop target. A placement is created only through `Convert to Placement` on the submission, which is what moves the card there.
+- Moving a submission never changes the candidate's overall status.
+
 ## Submission Rules
 - New submission from job detail is supported.
 - Job-order submissions can be ranked in recruiter preference order from the workspace using persisted drag-and-drop ordering.
@@ -72,6 +82,7 @@ Job order detail also includes a unified `Timeline` workspace tab that rolls up 
 
 ## Actions Menu
 Typical actions include:
+- Pipeline Board
 - Client Review Portal
 - Close job order (with confirmation)
 - View career posting

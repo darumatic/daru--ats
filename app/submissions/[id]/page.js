@@ -40,7 +40,13 @@ import {
 	withRecordNavigationQuery
 } from '@/lib/record-navigation-context';
 import { submissionOriginLabel } from '@/lib/submission-origin';
-import { getEffectiveSubmissionStatus, isSubmissionPlacementLocked } from '@/lib/submission-status';
+import {
+	formatSubmissionStatusLabel,
+	getEffectiveSubmissionStatus,
+	isSubmissionPlacementLocked,
+	SUBMISSION_STATUS_OPTIONS
+} from '@/lib/submission-status';
+import { formatClientFeedbackLabel } from '@/lib/client-feedback-label';
 import { buildSubmissionTimeline } from '@/lib/activity-timeline';
 import { SUBMISSION_CANDIDATE_SOURCE_OPTIONS } from '@/lib/submission-candidate-source-options';
 
@@ -53,18 +59,6 @@ const initialForm = {
 	aiWriteUp: '',
 	customFields: {}
 };
-
-function formatSubmissionStatusLabel(value) {
-	const normalized = String(value || '').trim().toLowerCase();
-	if (normalized === 'under_review') return 'Under Review';
-	if (normalized === 'submitted') return 'Submitted';
-	if (normalized === 'qualified') return 'Qualified';
-	if (normalized === 'rejected') return 'Rejected';
-	if (normalized === 'offered') return 'Offered';
-	if (normalized === 'hired') return 'Hired';
-	if (normalized === 'placed') return 'Placed';
-	return normalized ? normalized.replaceAll('_', ' ').replace(/\b\w/g, (match) => match.toUpperCase()) : '-';
-}
 
 function toForm(row) {
 	if (!row) return initialForm;
@@ -84,15 +78,6 @@ function toForm(row) {
 
 function formatDate(value) {
 	return formatDateTimeAt(value);
-}
-
-function formatClientFeedbackLabel(value) {
-	const normalized = String(value || '').trim().toLowerCase();
-	if (normalized === 'request_interview') return 'Requested Interview';
-	if (normalized === 'need_more_info') return 'Needs More Info';
-	if (normalized === 'pass') return 'Passed';
-	if (normalized === 'comment') return 'Feedback';
-	return normalized ? normalized.replaceAll('_', ' ').replace(/\b\w/g, (match) => match.toUpperCase()) : 'Client Update';
 }
 
 function formatClientPortalVisibilityLabel(value) {
@@ -782,13 +767,11 @@ export default function SubmissionDetailsPage() {
 										value={form.status}
 										onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
 									>
-										<option value="submitted">Submitted</option>
-										<option value="under_review">Under Review</option>
-										<option value="qualified">Qualified</option>
-										<option value="rejected">Rejected</option>
-										<option value="offered">Offered</option>
-										<option value="hired">Hired</option>
-										<option value="placed">Placed</option>
+										{SUBMISSION_STATUS_OPTIONS.map((option) => (
+											<option key={option.value} value={option.value}>
+												{option.label}
+											</option>
+										))}
 									</select>
 								)}
 							</FormField>

@@ -39,7 +39,8 @@ import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { hasMeaningfulRichTextContent } from '@/lib/rich-text';
 import { sortByConfig } from '@/lib/list-sort';
 import { submissionCreatedByLabel, submissionOriginLabel } from '@/lib/submission-origin';
-import { getEffectiveSubmissionStatus } from '@/lib/submission-status';
+import { formatSubmissionStatusLabel, getEffectiveSubmissionStatus, SUBMISSION_STATUS_OPTIONS } from '@/lib/submission-status';
+import { formatClientFeedbackLabel } from '@/lib/client-feedback-label';
 import { formatCurrencyInput, parseCurrencyInput } from '@/lib/currency-input';
 import { toBooleanFlag } from '@/lib/boolean-flag';
 import { displayClientName } from '@/lib/default-client';
@@ -101,25 +102,6 @@ function moveSubmissionId(orderedIds, draggedId, targetId) {
 	const [moved] = next.splice(fromIndex, 1);
 	next.splice(toIndex, 0, moved);
 	return next;
-}
-
-const submissionStatuses = [
-	{ value: 'submitted', label: 'Submitted' },
-	{ value: 'under_review', label: 'Under Review' },
-	{ value: 'qualified', label: 'Qualified' },
-	{ value: 'rejected', label: 'Rejected' },
-	{ value: 'offered', label: 'Offered' },
-	{ value: 'hired', label: 'Hired' },
-	{ value: 'placed', label: 'Placed' }
-];
-
-function formatClientFeedbackLabel(value) {
-	const normalized = String(value || '').trim().toLowerCase();
-	if (normalized === 'request_interview') return 'Requested Interview';
-	if (normalized === 'pass') return 'Passed';
-	if (normalized === 'comment') return 'Feedback';
-	if (normalized === 'need_more_info') return 'Needs More Info';
-	return normalized ? normalized.replaceAll('_', ' ').replace(/\b\w/g, (match) => match.toUpperCase()) : 'Client Update';
 }
 
 function toForm(row) {
@@ -1117,6 +1099,14 @@ export default function JobOrderDetailsPage() {
 										</button>
 									)
 								) : null}
+								<Link
+									href={`/job-orders/${id}/pipeline`}
+									role="menuitem"
+									className="actions-menu-item"
+									onClick={() => setActionsOpen(false)}
+								>
+									Pipeline Board
+								</Link>
 								<button
 									type="button"
 									role="menuitem"
@@ -1659,7 +1649,7 @@ export default function JobOrderDetailsPage() {
 											setSubmissionState((current) => ({ ...current, error: '', success: '' }));
 										}}
 									>
-										{submissionStatuses.map((statusOption) => (
+										{SUBMISSION_STATUS_OPTIONS.map((statusOption) => (
 											<option key={statusOption.value} value={statusOption.value}>
 												{statusOption.label}
 											</option>
@@ -1703,6 +1693,12 @@ export default function JobOrderDetailsPage() {
 								</div>
 							</form>
 							<h4 className="side-section-title">Current Submissions</h4>
+							<p className="panel-subtext">
+								<Link href={`/job-orders/${id}/pipeline`}>
+									Open the pipeline board
+								</Link>{' '}
+								to drag submissions between stages.
+							</p>
 							<div className="workspace-scroll-area">
 								<ListSortControls
 									label="Sort Submissions"
@@ -1841,7 +1837,7 @@ export default function JobOrderDetailsPage() {
 														<ArrowUpRight aria-hidden="true" />
 													</Link>
 													<div className="submission-chip-stack">
-														<span className="chip">{formatSelectValueLabel(getEffectiveSubmissionStatus(submission))}</span>
+														<span className="chip">{formatSubmissionStatusLabel(getEffectiveSubmissionStatus(submission))}</span>
 														<span
 															className={
 																submissionOriginLabel(submission) === 'Web'
