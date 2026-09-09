@@ -56,6 +56,36 @@ describe('sanitizeRichTextHtml', () => {
 			const result = sanitizeRichTextHtml('<a href="data:text/html,<script>x</script>">link</a>');
 			expect(result).not.toContain('data:');
 		});
+
+		// The two vectors patched in sanitize-html 2.17.7. Our allowed-tag list
+		// never included textarea or svg, but pin the outcome so a downgrade or a
+		// widened tag list cannot quietly reopen them.
+		it('neutralises the </textarea/> solidus-close mutation XSS (GHSA-jxwj-j7wr-gfrw)', () => {
+			const result = sanitizeRichTextHtml('<p>ok</p><textarea></textarea/><script>alert(1)</script>');
+			expect(result).toBe('<p>ok</p>');
+		});
+
+		it('neutralises the </textarea/> solidus-close carrying an onerror payload', () => {
+			const result = sanitizeRichTextHtml('<textarea><p></textarea/><img src=x onerror=alert(1)>');
+			expect(result ?? '').not.toContain('onerror');
+			expect(result ?? '').not.toContain('<img');
+		});
+
+		it('drops SVG SMIL animate elements smuggling a javascript: URI (GHSA-g8qq-57p8-ggw5)', () => {
+			const result = sanitizeRichTextHtml(
+				'<svg><animate attributeName="href" values="javascript:alert(1)" /></svg>'
+			);
+			expect(result).toBeNull();
+		});
+
+		it('drops SVG SMIL scheme-policy bypass inside a link, keeping only inert text', () => {
+			const result = sanitizeRichTextHtml(
+				'<p>hi</p><svg><a><animate attributeName="href" values="https://ok.test;javascript:alert(1)"/><text>x</text></a></svg>'
+			);
+			expect(result).not.toContain('javascript:');
+			expect(result).not.toContain('<animate');
+			expect(result).not.toContain('href');
+		});
 	});
 
 	describe('safe HTML preserved', () => {
