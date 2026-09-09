@@ -394,11 +394,7 @@ export default function CandidateDetailsPage() {
 			editForm.email.trim() &&
 			editForm.mobile.trim() &&
 			editForm.status.trim() &&
-			editForm.source.trim() &&
-			(!isAdmin || editForm.divisionId.trim()) &&
-			editForm.ownerId.trim() &&
-			editForm.currentJobTitle.trim() &&
-			editForm.currentEmployer.trim()
+			editForm.source.trim()
 	);
 	const hasValidEmail = isValidEmailAddress(editForm.email);
 	const hasValidWebsite = isValidOptionalHttpUrl(editForm.website);
@@ -1071,9 +1067,7 @@ export default function CandidateDetailsPage() {
 			setSaveState({
 				saving: false,
 				error:
-					isAdmin
-						? 'Complete required fields (First Name, Last Name, Email, Mobile, Stage, Source, Division, Owner), use valid email/URLs, and add a status change reason when changing status.'
-						: 'Complete required fields (First Name, Last Name, Email, Mobile, Stage, Source, Owner), use valid email/URLs, and add a status change reason when changing status.',
+					'Complete required fields (First Name, Last Name, Email, Mobile, Stage, Source), use valid email/URLs, and add a status change reason when changing status.',
 				success: ''
 			});
 			return;
@@ -1865,7 +1859,7 @@ export default function CandidateDetailsPage() {
 						</div>
 						<div className="detail-form-grid-2">
 							{isAdmin ? (
-								<FormField label="Division" required>
+								<FormField label="Division">
 									<LookupTypeaheadSelect
 										entity="divisions"
 										lookupParams={{}}
@@ -1883,7 +1877,7 @@ export default function CandidateDetailsPage() {
 									/>
 								</FormField>
 							) : null}
-							<FormField label="Owner" required>
+							<FormField label="Owner">
 								<LookupTypeaheadSelect
 									entity="users"
 									lookupParams={isAdmin && editForm.divisionId ? { divisionId: editForm.divisionId } : {}}
@@ -1914,18 +1908,16 @@ export default function CandidateDetailsPage() {
 					<section className="form-section">
 						<h4>Current Role</h4>
 						<div className="detail-form-grid-2">
-							<FormField label="Current Job Title" required>
+							<FormField label="Current Job Title">
 								<input
 									value={editForm.currentJobTitle}
 									onChange={(e) => setEditForm((f) => ({ ...f, currentJobTitle: e.target.value }))}
-									required
 								/>
 							</FormField>
-							<FormField label="Current Employer" required>
+							<FormField label="Current Employer">
 								<input
 									value={editForm.currentEmployer}
 									onChange={(e) => setEditForm((f) => ({ ...f, currentEmployer: e.target.value }))}
-									required
 								/>
 							</FormField>
 						</div>

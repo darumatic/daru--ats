@@ -195,11 +195,7 @@ function NewCandidatePageContent() {
 			form.email.trim() &&
 			form.mobile.trim() &&
 			form.status.trim() &&
-			form.source.trim() &&
-			form.ownerId.trim() &&
-			(!isAdmin || form.divisionId.trim()) &&
-			form.currentJobTitle.trim() &&
-			form.currentEmployer.trim()
+			form.source.trim()
 	);
 	const hasValidEmail = isValidEmailAddress(form.email);
 	const hasValidWebsite = isValidOptionalHttpUrl(form.website);
@@ -222,9 +218,8 @@ function NewCandidatePageContent() {
 		form.linkedinUrl.trim() && !hasValidLinkedinUrl
 			? 'Enter a valid LinkedIn URL, including http:// or https://.'
 			: '';
-	const requiredFieldsMessage = isAdmin
-		? 'Complete required fields (First Name, Last Name, Email, Mobile, Stage, Source, Division, Owner) and use valid email/URL values.'
-		: 'Complete required fields (First Name, Last Name, Email, Mobile, Stage, Source, Owner) and use valid email/URL values.';
+	const requiredFieldsMessage =
+		'Complete required fields (First Name, Last Name, Email, Mobile, Stage, Source) and use valid email/URL values.';
 
 	useEffect(() => {
 		let cancelled = false;
@@ -708,7 +703,7 @@ function NewCandidatePageContent() {
 							</div>
 							{isAdmin ? (
 								<div className="form-grid-2">
-									<FormField label="Division" required>
+									<FormField label="Division">
 										<LookupTypeaheadSelect
 											entity="divisions"
 											lookupParams={{}}
@@ -727,7 +722,6 @@ function NewCandidatePageContent() {
 									</FormField>
 									<FormField
 										label="Owner"
-										required
 										hint={ownerLockedForParsedDraft ? 'Locked to current user for parsed resumes' : ''}
 									>
 										<LookupTypeaheadSelect
@@ -751,7 +745,6 @@ function NewCandidatePageContent() {
 							) : (
 								<FormField
 									label="Owner"
-									required
 									hint={ownerLockedForParsedDraft ? 'Locked to current user for parsed resumes' : ''}
 								>
 									<LookupTypeaheadSelect
@@ -767,18 +760,16 @@ function NewCandidatePageContent() {
 								</FormField>
 							)}
 							<div className="form-grid-2">
-								<FormField label="Current Job Title" required>
+								<FormField label="Current Job Title">
 									<input
 										value={form.currentJobTitle}
 										onChange={(e) => setForm((f) => ({ ...f, currentJobTitle: e.target.value }))}
-										required
 									/>
 								</FormField>
-								<FormField label="Current Employer" required>
+								<FormField label="Current Employer">
 									<input
 										value={form.currentEmployer}
 										onChange={(e) => setForm((f) => ({ ...f, currentEmployer: e.target.value }))}
-										required
 									/>
 								</FormField>
 							</div>

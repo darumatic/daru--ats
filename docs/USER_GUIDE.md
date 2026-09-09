@@ -125,8 +125,8 @@ Primary purpose:
 
 Common actions:
 1. `Candidates > New Candidate`
-2. Fill required identity fields.
-3. Add status, source, owner, and current employment details.
+2. Fill the required fields: first name, last name, email, mobile, stage, and source.
+3. Optionally add division, owner, current job title, and current employer. A lead often arrives without them, so they never block the save: division and owner fall back to the acting user's own division (administrators fall back to the `Unassigned` division), and the missing current-role detail shows up as a profile-completeness gap instead. Owner is still enforced by the server when the division's access mode is `Owner Only`.
 4. Add notes, education, work history, and file attachments.
 5. Use the candidate detail sparkles `AI Summary` header button to open the summary modal. If no summary exists yet, it generates automatically.
 6. Use the candidate detail snapshot card to quickly review title, location, status, top skills, AI summary snippet, last activity, and profile completeness before submission.
