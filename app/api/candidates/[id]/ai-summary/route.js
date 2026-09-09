@@ -10,7 +10,7 @@ import { createRecordId } from '@/lib/record-id';
 import { logCreate, logUpdate } from '@/lib/audit-log';
 import { parseRouteId, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
-import { generateCandidateSummaryWithOpenAi } from '@/lib/openai-candidate-summary';
+import { generateCandidateSummaryWithAi } from '@/lib/ai-candidate-summary';
 import { withApiLogging } from '@/lib/api-logging';
 
 function buildCandidateSummarySourceInclude() {
@@ -78,7 +78,7 @@ async function postCandidates_id_ai_summaryHandler(req, { params }) {
 			return NextResponse.json({ error: 'Candidate not found.' }, { status: 404 });
 		}
 
-		const generated = await generateCandidateSummaryWithOpenAi(candidate);
+		const generated = await generateCandidateSummaryWithAi(candidate);
 		if (!generated.ok) {
 			return NextResponse.json({ error: generated.error || 'Failed to generate candidate summary.' }, { status: 400 });
 		}

@@ -44,7 +44,9 @@ model SystemSetting {
 	careerHeroBody    String?  @db.Text
 	apiErrorLogRetentionDays Int @default(90)
 	googleMapsApiKey  String?  @db.Text
-	openAiApiKey      String?  @db.Text
+	aiApiKey          String?  @db.Text @map("openAiApiKey")
+	aiProvider        String?
+	aiModel           String?
 	smtpHost          String?
 	smtpPort          Int?
 	smtpSecure        Boolean  @default(false)

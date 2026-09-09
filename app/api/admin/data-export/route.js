@@ -117,7 +117,7 @@ function extractSafeSystemSettings(setting) {
 		logoContentType: setting.logoContentType,
 		logoFileName: setting.logoFileName,
 		hasGoogleMapsApiKey: Boolean(String(setting.googleMapsApiKey || '').trim()),
-		hasOpenAiApiKey: Boolean(String(setting.openAiApiKey || '').trim()),
+		hasAiApiKey: Boolean(String(setting.aiApiKey || '').trim()),
 		hasSmtpHost: Boolean(String(setting.smtpHost || '').trim()),
 		hasSmtpUser: Boolean(String(setting.smtpUser || '').trim()),
 		hasSmtpPass: Boolean(String(setting.smtpPass || '').trim()),

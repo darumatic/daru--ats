@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { addScopeToWhere, getActingUser, getEntityScope } from '@/lib/access-control';
-import { enhancePublicJobPostingWithOpenAi } from '@/lib/openai-job-posting-enhancer';
+import { enhancePublicJobPostingWithAi } from '@/lib/ai-job-posting-enhancer';
 import { hasMeaningfulRichTextContent } from '@/lib/rich-text';
 import { parseRouteId } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
@@ -56,7 +56,7 @@ async function postJob_orders_id_enhance_public_descriptionHandler(req, { params
 		);
 	}
 
-	const result = await enhancePublicJobPostingWithOpenAi({
+	const result = await enhancePublicJobPostingWithAi({
 		title: asString(body?.title) || existing.title,
 		description: asString(body?.description) || asString(existing.description),
 		publicDescription,

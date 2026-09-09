@@ -61,9 +61,9 @@ Behavior:
 - Copy directly to the clipboard from the toolbar
 - Output is stored on the submission record
 - Recruiters can edit the generated text before saving
-- Uses the OpenAI API key from `Admin Area > System Settings`
+- Uses the AI API key from `Admin Area > System Settings`
 - If the submission is converted to a placement, the write-up remains visible but is locked
-- If OpenAI is not configured, the generate control remains visible but disabled with an inline hint
+- If no AI provider is configured, the generate control remains visible but disabled with an inline hint
 
 ## Client Feedback
 Submission detail includes a `Client Feedback` section for portal-driven client responses.

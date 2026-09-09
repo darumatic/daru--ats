@@ -59,21 +59,23 @@ async function buildIntegrationHealth() {
 			? true
 			: buildPresenceFlag(objectStorage.bucket);
 		return {
-			openAi: buildPresenceFlag(integrationSettings.openAiApiKey),
+			ai: buildPresenceFlag(integrationSettings.aiApiKey),
 			googleMaps: buildPresenceFlag(integrationSettings.googleMapsApiKey),
 			smtp: buildPresenceFlag(integrationSettings.smtpHost)
 				&& buildPresenceFlag(integrationSettings.smtpUser),
-			openAiResumeModel: integrationSettings.openAiResumeModel || 'default',
+			aiProvider: integrationSettings.aiProvider || 'default',
+			aiModel: integrationSettings.aiModel || 'default',
 			careerSiteEnabled: Boolean(integrationSettings.careerSiteEnabled),
 			objectStorageMode: objectStorage.mode,
 			objectStorageConfigured
 		};
 	} catch {
 		return {
-			openAi: false,
+			ai: false,
 			googleMaps: false,
 			smtp: false,
-			openAiResumeModel: 'default',
+			aiProvider: 'default',
+			aiModel: 'default',
 			careerSiteEnabled: false,
 			objectStorageMode: 'local',
 			objectStorageConfigured: false

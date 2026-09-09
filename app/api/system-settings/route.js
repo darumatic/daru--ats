@@ -16,6 +16,7 @@ import {
 	DEFAULT_API_ERROR_LOG_RETENTION_DAYS
 } from '@/lib/system-settings';
 import { DEFAULT_THEME_KEY, normalizeThemeKey } from '@/lib/theme-options';
+import { normalizeAiProvider } from '@/lib/ai-providers';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
 
 import { withApiLogging } from '@/lib/api-logging';
@@ -127,9 +128,13 @@ async function parseBody(req) {
 			googleMapsApiKey: formData.has('googleMapsApiKey')
 				? asTrimmedString(formData.get('googleMapsApiKey'))
 				: undefined,
-			openAiApiKey: formData.has('openAiApiKey')
-				? asTrimmedString(formData.get('openAiApiKey'))
+			aiApiKey: formData.has('aiApiKey')
+				? asTrimmedString(formData.get('aiApiKey'))
 				: undefined,
+			aiProvider: formData.has('aiProvider')
+				? asTrimmedString(formData.get('aiProvider'))
+				: undefined,
+			aiModel: formData.has('aiModel') ? asTrimmedString(formData.get('aiModel')) : undefined,
 			smtpHost: formData.has('smtpHost') ? asTrimmedString(formData.get('smtpHost')) : undefined,
 			smtpPort: formData.has('smtpPort') ? asTrimmedString(formData.get('smtpPort')) : undefined,
 			smtpSecure: formData.has('smtpSecure') ? toBoolean(formData.get('smtpSecure')) : undefined,
@@ -185,7 +190,9 @@ async function parseBody(req) {
 				removeLogo: formData.has('removeLogo'),
 				logoFile: Boolean(logoFile),
 				googleMapsApiKey: formData.has('googleMapsApiKey'),
-				openAiApiKey: formData.has('openAiApiKey'),
+				aiApiKey: formData.has('aiApiKey'),
+				aiProvider: formData.has('aiProvider'),
+				aiModel: formData.has('aiModel'),
 				smtpHost: formData.has('smtpHost'),
 				smtpPort: formData.has('smtpPort'),
 				smtpSecure: formData.has('smtpSecure'),
@@ -232,9 +239,13 @@ async function parseBody(req) {
 		googleMapsApiKey: hasOwnProperty(body, 'googleMapsApiKey')
 			? asTrimmedString(body?.googleMapsApiKey)
 			: undefined,
-		openAiApiKey: hasOwnProperty(body, 'openAiApiKey')
-			? asTrimmedString(body?.openAiApiKey)
+		aiApiKey: hasOwnProperty(body, 'aiApiKey')
+			? asTrimmedString(body?.aiApiKey)
 			: undefined,
+		aiProvider: hasOwnProperty(body, 'aiProvider')
+			? asTrimmedString(body?.aiProvider)
+			: undefined,
+		aiModel: hasOwnProperty(body, 'aiModel') ? asTrimmedString(body?.aiModel) : undefined,
 		smtpHost: hasOwnProperty(body, 'smtpHost') ? asTrimmedString(body?.smtpHost) : undefined,
 		smtpPort: hasOwnProperty(body, 'smtpPort') ? asTrimmedString(body?.smtpPort) : undefined,
 		smtpSecure: hasOwnProperty(body, 'smtpSecure') ? Boolean(body?.smtpSecure) : undefined,
@@ -290,7 +301,9 @@ async function parseBody(req) {
 			removeLogo: hasOwnProperty(body, 'removeLogo'),
 			logoFile: false,
 			googleMapsApiKey: hasOwnProperty(body, 'googleMapsApiKey'),
-			openAiApiKey: hasOwnProperty(body, 'openAiApiKey'),
+			aiApiKey: hasOwnProperty(body, 'aiApiKey'),
+			aiProvider: hasOwnProperty(body, 'aiProvider'),
+			aiModel: hasOwnProperty(body, 'aiModel'),
 			smtpHost: hasOwnProperty(body, 'smtpHost'),
 			smtpPort: hasOwnProperty(body, 'smtpPort'),
 			smtpSecure: hasOwnProperty(body, 'smtpSecure'),
@@ -598,9 +611,15 @@ async function patchSystem_settingsHandler(req) {
 			googleMapsApiKey: input.googleMapsApiKey === undefined
 				? existing?.googleMapsApiKey || null
 				: input.googleMapsApiKey || null,
-		openAiApiKey: input.openAiApiKey === undefined
-			? existing?.openAiApiKey || null
-			: input.openAiApiKey || null,
+		aiApiKey: input.aiApiKey === undefined
+			? existing?.aiApiKey || null
+			: input.aiApiKey || null,
+		aiProvider: input.aiProvider === undefined
+			? existing?.aiProvider || null
+			: normalizeAiProvider(input.aiProvider),
+		aiModel: input.aiModel === undefined
+			? existing?.aiModel || null
+			: input.aiModel || null,
 		smtpHost: input.smtpHost === undefined
 			? existing?.smtpHost || null
 			: input.smtpHost || null,

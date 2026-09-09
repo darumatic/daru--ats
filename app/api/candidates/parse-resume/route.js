@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { parseResumeToDraft } from '@/lib/resume-parser';
 import { extractResumeTextFromFile } from '@/lib/resume-file-parser';
-import { parseResumeToDraftWithOpenAi } from '@/lib/openai-resume-parser';
+import { parseResumeToDraftWithAi } from '@/lib/ai-resume-parser';
 import { buildResumeSummaryText } from '@/lib/resume-summary';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
 import {
@@ -18,32 +18,32 @@ const parseResumeSchema = z.object({
 });
 
 async function parseResumeDraft(resumeText) {
-	const openAiResult = await parseResumeToDraftWithOpenAi(resumeText);
-	if (openAiResult.ok) {
+	const aiResult = await parseResumeToDraftWithAi(resumeText);
+	if (aiResult.ok) {
 		const draft = {
-			...openAiResult.draft,
+			...aiResult.draft,
 			summary: buildResumeSummaryText({
 				rawResumeText: resumeText,
-				draft: openAiResult.draft,
-				parsedSkills: openAiResult.parsedSkills || [],
-				educationRecords: openAiResult.educationRecords || [],
-				workExperienceRecords: openAiResult.workExperienceRecords || []
+				draft: aiResult.draft,
+				parsedSkills: aiResult.parsedSkills || [],
+				educationRecords: aiResult.educationRecords || [],
+				workExperienceRecords: aiResult.workExperienceRecords || []
 			})
 		};
 
 		return {
 			draft,
-			warnings: openAiResult.warnings,
-			parsedSkills: openAiResult.parsedSkills || [],
-			educationRecords: openAiResult.educationRecords || [],
-			workExperienceRecords: openAiResult.workExperienceRecords || [],
+			warnings: aiResult.warnings,
+			parsedSkills: aiResult.parsedSkills || [],
+			educationRecords: aiResult.educationRecords || [],
+			workExperienceRecords: aiResult.workExperienceRecords || [],
 			parser: 'openai'
 		};
 	}
 
 	const fallbackResult = parseResumeToDraft(resumeText);
 	const warnings = [
-		...(openAiResult.warning ? [openAiResult.warning] : []),
+		...(aiResult.warning ? [aiResult.warning] : []),
 		...(Array.isArray(fallbackResult.warnings) ? fallbackResult.warnings : [])
 	];
 	const draft = {

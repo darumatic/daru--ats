@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { AccessControlError, addScopeToWhere, getActingUser, getEntityScope } from '@/lib/access-control';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
-import { generateEmailDraftWithOpenAi } from '@/lib/openai-email-draft';
+import { generateEmailDraftWithAi } from '@/lib/ai-email-draft';
 import { withApiLogging } from '@/lib/api-logging';
 
 const requestSchema = z.object({
@@ -80,7 +80,7 @@ async function postEmail_draftsHandler(req) {
 			);
 		}
 
-		const generated = await generateEmailDraftWithOpenAi({
+		const generated = await generateEmailDraftWithAi({
 			entityType: parsed.data.entityType,
 			entity,
 			purpose: parsed.data.purpose,

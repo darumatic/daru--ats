@@ -38,8 +38,8 @@ Test safety behavior:
 - Interview detail includes an `Interview Questions` area for AI-assisted question generation.
 - Generation uses the candidate profile, resume/work history, skills, and linked job order context.
 - Questions are stored on the interview record so recruiters can review, edit, regenerate, or copy them later.
-- Uses the OpenAI API key from `Admin Area > System Settings`.
-- If OpenAI is not configured, the generate control remains visible but disabled with an inline hint.
+- Uses the AI API key from `Admin Area > System Settings`.
+- If no AI provider is configured, the generate control remains visible but disabled with an inline hint.
 
 ## Best Practice
 1. Confirm participant emails before save.

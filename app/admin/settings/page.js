@@ -8,6 +8,12 @@ import FormField from '@/app/components/form-field';
 import LoadingIndicator from '@/app/components/loading-indicator';
 import { useToast } from '@/app/components/toast-provider';
 import { THEME_OPTIONS } from '@/lib/theme-options';
+import {
+	AI_PROVIDER_OPENAI,
+	AI_PROVIDER_OPTIONS,
+	getAiProviderProfile,
+	normalizeAiProvider
+} from '@/lib/ai-providers';
 import { toBooleanFlag } from '@/lib/boolean-flag';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { isSafeImageSrc } from '@/lib/url-validation';
@@ -22,7 +28,9 @@ const initialForm = {
 	apiErrorLogRetentionDays: '90',
 	removeLogo: false,
 	googleMapsApiKey: '',
-	openAiApiKey: '',
+	aiApiKey: '',
+	aiProvider: AI_PROVIDER_OPENAI,
+	aiModel: '',
 	objectStorageProvider: 's3',
 	objectStorageRegion: 'us-east-1',
 	objectStorageBucket: '',
@@ -77,6 +85,8 @@ export default function AdminSettingsPage() {
 	const [demoMode, setDemoMode] = useState(false);
 	const [form, setForm] = useState(initialForm);
 	const [savedForm, setSavedForm] = useState(initialForm);
+	// Drives the key/model hints, so they describe the provider actually selected.
+	const aiProviderProfile = getAiProviderProfile(form.aiProvider);
 	const [logoFile, setLogoFile] = useState(null);
 	const [logoPreviewUrl, setLogoPreviewUrl] = useState('');
 	const [emailTestSettings, setEmailTestSettings] = useState({
@@ -208,7 +218,9 @@ export default function AdminSettingsPage() {
 	const platformDirty = useMemo(
 		() =>
 			String(form.googleMapsApiKey || '') !== String(savedForm.googleMapsApiKey || '')
-			|| String(form.openAiApiKey || '') !== String(savedForm.openAiApiKey || '')
+			|| String(form.aiApiKey || '') !== String(savedForm.aiApiKey || '')
+			|| String(form.aiProvider || '') !== String(savedForm.aiProvider || '')
+			|| String(form.aiModel || '') !== String(savedForm.aiModel || '')
 			|| String(form.apiErrorLogRetentionDays || '') !== String(savedForm.apiErrorLogRetentionDays || '')
 			|| String(form.smtpHost || '') !== String(savedForm.smtpHost || '')
 			|| String(form.smtpPort || '') !== String(savedForm.smtpPort || '')
@@ -238,7 +250,9 @@ export default function AdminSettingsPage() {
 			form.objectStorageProvider,
 			form.objectStorageRegion,
 			form.objectStorageSecretAccessKey,
-			form.openAiApiKey,
+			form.aiApiKey,
+			form.aiProvider,
+			form.aiModel,
 			form.smtpFromEmail,
 			form.smtpFromName,
 			form.smtpHost,
@@ -259,7 +273,9 @@ export default function AdminSettingsPage() {
 			savedForm.objectStorageProvider,
 			savedForm.objectStorageRegion,
 			savedForm.objectStorageSecretAccessKey,
-			savedForm.openAiApiKey,
+			savedForm.aiApiKey,
+			savedForm.aiProvider,
+			savedForm.aiModel,
 			savedForm.smtpFromEmail,
 			savedForm.smtpFromName,
 			savedForm.smtpHost,
@@ -293,7 +309,9 @@ export default function AdminSettingsPage() {
 			apiErrorLogRetentionDays: String(data.apiErrorLogRetentionDays || fallback.apiErrorLogRetentionDays || 90),
 			removeLogo: false,
 			googleMapsApiKey: data.googleMapsApiKey ?? fallback.googleMapsApiKey ?? '',
-			openAiApiKey: data.openAiApiKey ?? fallback.openAiApiKey ?? '',
+			aiApiKey: data.aiApiKey ?? fallback.aiApiKey ?? '',
+			aiProvider: normalizeAiProvider(data.aiProvider ?? fallback.aiProvider),
+			aiModel: data.aiModel ?? fallback.aiModel ?? '',
 			objectStorageProvider: data.objectStorageProvider || fallback.objectStorageProvider || 's3',
 			objectStorageRegion: data.objectStorageRegion || fallback.objectStorageRegion || 'us-east-1',
 			objectStorageBucket: data.objectStorageBucket ?? fallback.objectStorageBucket ?? '',
@@ -392,7 +410,9 @@ export default function AdminSettingsPage() {
 		setPlatformSaving(true);
 		const payload = new FormData();
 		payload.set('googleMapsApiKey', form.googleMapsApiKey);
-		payload.set('openAiApiKey', form.openAiApiKey);
+		payload.set('aiApiKey', form.aiApiKey);
+		payload.set('aiProvider', form.aiProvider);
+		payload.set('aiModel', form.aiModel);
 		payload.set('apiErrorLogRetentionDays', form.apiErrorLogRetentionDays || '90');
 		payload.set('objectStorageProvider', form.objectStorageProvider);
 		payload.set('objectStorageRegion', form.objectStorageRegion);
@@ -811,13 +831,38 @@ export default function AdminSettingsPage() {
 										disabled={demoMode}
 									/>
 								</FormField>
-								<FormField label="OpenAI API Key" hint="Used for AI resume parsing. Leave blank to use the fallback parser only.">
+								<FormField label="AI Provider" hint="Which service the AI features call. Both are reached through the OpenAI-compatible chat API.">
+									<select
+										value={form.aiProvider}
+										onChange={(event) =>
+											setForm((current) => ({ ...current, aiProvider: event.target.value }))
+										}
+										disabled={demoMode}
+									>
+										{AI_PROVIDER_OPTIONS.map((option) => (
+											<option key={option.value} value={option.value}>
+												{option.label}
+											</option>
+										))}
+									</select>
+								</FormField>
+								<FormField label="AI API Key" hint={aiProviderProfile.apiKeyHint + ' Leave blank to use the fallback resume parser only.'}>
 									<input
 										type="password"
-										value={form.openAiApiKey}
+										value={form.aiApiKey}
 										onChange={(event) =>
-											setForm((current) => ({ ...current, openAiApiKey: event.target.value }))
+											setForm((current) => ({ ...current, aiApiKey: event.target.value }))
 										}
+										disabled={demoMode}
+									/>
+								</FormField>
+								<FormField label="AI Model" hint={`Leave blank to use ${aiProviderProfile.defaultModel}.`}>
+									<input
+										value={form.aiModel}
+										onChange={(event) =>
+											setForm((current) => ({ ...current, aiModel: event.target.value }))
+										}
+										placeholder={aiProviderProfile.defaultModel}
 										disabled={demoMode}
 									/>
 								</FormField>

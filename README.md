@@ -52,7 +52,7 @@ When demo mode is enabled, authenticated demo users see a one-time welcome modal
 - AI match explanations on candidate/job-order match lists with cached, refreshable fit analysis that auto-generates on first open
 - AI email drafting from candidate and contact actions menus with purpose/tone controls and copy-to-clipboard
 - AI editor actions use the shared sparkles icon pattern for consistency across candidate and job-order detail views
-- AI-specific controls stay visible but are disabled with an inline hint when no OpenAI key is configured in system settings
+- AI-specific controls stay visible but are disabled with an inline hint when no AI key is configured in system settings
 - Job-order submission workspaces support recruiter priority ordering with persisted drag-and-drop ranking
 - Client review portal with persistent magic links per job-order contact, allowing external review of submitted candidates without a login
 - Career-site web responses stay differentiated from recruiter-curated submissions and remain hidden from the client portal until a recruiter promotes them
@@ -166,7 +166,7 @@ Use `Admin Area > System Settings` for:
 - Career site enabled/disabled
 - Client review portal enabled/disabled
 - Google Maps API key
-- OpenAI API key
+- AI provider API key (OpenAI or Google Gemini)
 - Bullhorn API credentials for background export jobs
 - SMTP settings
 - Object storage settings (`s3` or local mode)
@@ -300,7 +300,7 @@ Use `.env` for:
 #### AI And Parsing
 | Variable | Default | Purpose |
 |---|---|---|
-| `OPENAI_RESUME_MODEL` | `gpt-4o-mini` | Model used for resume parsing/enrichment calls when OpenAI key exists in system settings. |
+| `OPENAI_RESUME_MODEL` | provider default | Legacy override for the AI model. The `AI Model` field in `Admin Area > System Settings` takes precedence; with neither set, the provider default is used (`gpt-4o-mini` for OpenAI, `gemini-2.5-flash` for Gemini). |
 
 #### File Storage
 | Variable | Default | Purpose |
@@ -503,7 +503,7 @@ Client review portal:
 - Configure system integrations in Admin settings:
 	- SMTP
 	- Object storage
-	- Google/OpenAI keys as needed
+	- Google/AI provider keys as needed
 - Run:
 	- `npm run ci:preflight`
 	- `npm run build:deploy`

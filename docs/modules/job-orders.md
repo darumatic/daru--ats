@@ -37,8 +37,8 @@ If career site is enabled in system settings:
 ## Public Description Editor
 Rich text formatting is available for readability and candidate conversion quality.
 
-When OpenAI is configured, the editor also supports a sparkles AI enhance action in the public-description toolbar.
-If OpenAI is not configured, that control remains visible but disabled with a hint.
+When an AI provider is configured, the editor also supports a sparkles AI enhance action in the public-description toolbar.
+If no AI provider is configured, that control remains visible but disabled with a hint.
 
 ## Job Workspace
 Use workspace tabs for:
@@ -72,7 +72,7 @@ Each job order has its own Kanban board at `/job-orders/{id}/pipeline`. It opens
 - Duplicate candidate+job submissions are blocked.
 - Candidate typeahead is optimized for larger datasets and qualification filtering.
 - Candidate match rows support `Explain Match`, which opens a saved AI explanation of fit, gaps, and recruiter validation points for that candidate/job pair.
-- If OpenAI is not configured, `Explain Match` remains visible but disabled with a tooltip/hint.
+- If no AI provider is configured, `Explain Match` remains visible but disabled with a tooltip/hint.
 
 ## Bulk Close From The List
 - In the job-order list (table view) each row has a checkbox; the header checkbox selects or clears the current page.

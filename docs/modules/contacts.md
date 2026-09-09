@@ -52,7 +52,7 @@ What it does:
 
 Behavior:
 - On demand only; drafts are not auto-saved to the record
-- Requires an OpenAI API key in `Admin Area > System Settings`
+- Requires an AI API key in `Admin Area > System Settings`
 - If AI is unavailable, the action remains visible but disabled with a hint
 
 ## Best Practice

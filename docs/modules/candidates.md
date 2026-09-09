@@ -100,9 +100,9 @@ The generated summary includes:
 Behavior:
 - Opening the modal auto-generates the first summary when none exists.
 - Existing summaries can be refreshed from the modal.
-- Requires an OpenAI API key in `Admin Area > System Settings`.
+- Requires an AI API key in `Admin Area > System Settings`.
 - The summary is stored separately from the resume text.
-- If OpenAI is not configured, the AI controls remain visible but disabled with an inline hint.
+- If no AI provider is configured, the AI controls remain visible but disabled with an inline hint.
 
 ## Match Explanations
 The matched job orders workspace supports `Explain Match`.
@@ -119,7 +119,7 @@ Behavior:
 - Generated on demand
 - Saved and reusable for that candidate/job pair
 - Can be refreshed when the candidate or job order changes
-- If OpenAI is not configured, `Explain Match` remains visible but disabled with a tooltip/hint.
+- If no AI provider is configured, `Explain Match` remains visible but disabled with a tooltip/hint.
 
 ## Actions Menu
 From candidate detail, actions can launch:
@@ -145,7 +145,7 @@ What it does:
 
 Behavior:
 - On demand only; drafts are not auto-saved to the record
-- Requires an OpenAI API key in `Admin Area > System Settings`
+- Requires an AI API key in `Admin Area > System Settings`
 - If AI is unavailable, the action remains visible but disabled with a hint
 
 ## Duplicate Protection

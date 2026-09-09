@@ -93,7 +93,7 @@ Important demo-specific behavior:
 - Email and URL fields are validated.
 - Phone and currency fields auto-format while typing.
 - Zip-based city/state inference is applied where configured.
-- AI features show a disabled control plus a hint when OpenAI has not been configured in `Admin Area > System Settings`.
+- AI features show a disabled control plus a hint when no AI provider has been configured in `Admin Area > System Settings`.
 
 ## 5) Module Guides
 
@@ -173,7 +173,7 @@ Email drafting:
 - Candidate actions include `Draft Email`.
 - Choose purpose and tone, optionally add instructions, then generate a reusable draft.
 - Copy the generated subject/body directly to the clipboard.
-- If OpenAI is not configured, the action stays visible but disabled with a hint.
+- If no AI provider is configured, the action stays visible but disabled with a hint.
 
 ## Clients
 
@@ -211,7 +211,7 @@ Behavior notes:
 - When creating from a client route, client is locked.
 - For existing contact records, client is not editable.
 - Contact actions include `Draft Email` for recruiter-facing outbound draft generation.
-- If OpenAI is not configured, the action stays visible but disabled with a hint.
+- If no AI provider is configured, the action stays visible but disabled with a hint.
 - Use `Advanced Search` on the contacts list when quick lookup is not enough, for example `Client = Atlas Test` plus `Job Orders >= 1` or `Last Activity Date in past 30 days`.
 
 ## Job Orders

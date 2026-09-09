@@ -5,7 +5,7 @@ import { getCandidateJobOrderScope } from '@/lib/related-record-scope';
 import { logUpdate } from '@/lib/audit-log';
 import { parseRouteId, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
-import { generateSubmissionWriteUpWithOpenAi } from '@/lib/openai-submission-write-up';
+import { generateSubmissionWriteUpWithAi } from '@/lib/ai-submission-write-up';
 import { withApiLogging } from '@/lib/api-logging';
 
 const submissionWriteUpInclude = {
@@ -79,7 +79,7 @@ async function postSubmissions_id_generate_write_upHandler(req, { params }) {
 			);
 		}
 
-		const generated = await generateSubmissionWriteUpWithOpenAi(submission);
+		const generated = await generateSubmissionWriteUpWithAi(submission);
 		if (!generated.ok) {
 			return NextResponse.json({ error: generated.error || 'Failed to generate submission write-up.' }, { status: 400 });
 		}

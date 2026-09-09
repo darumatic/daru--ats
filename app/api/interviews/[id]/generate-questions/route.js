@@ -5,7 +5,7 @@ import { getCandidateJobOrderScope } from '@/lib/related-record-scope';
 import { logUpdate } from '@/lib/audit-log';
 import { parseRouteId, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
-import { generateInterviewQuestionSetWithOpenAi } from '@/lib/openai-interview-question-set';
+import { generateInterviewQuestionSetWithAi } from '@/lib/ai-interview-question-set';
 import { withApiLogging } from '@/lib/api-logging';
 
 const interviewQuestionInclude = {
@@ -66,7 +66,7 @@ async function postInterviews_id_generate_questionsHandler(req, { params }) {
 			return NextResponse.json({ error: 'Interview not found.' }, { status: 404 });
 		}
 
-		const generated = await generateInterviewQuestionSetWithOpenAi(interview);
+		const generated = await generateInterviewQuestionSetWithAi(interview);
 		if (!generated.ok) {
 			return NextResponse.json(
 				{ error: generated.error || 'Failed to generate interview question set.' },

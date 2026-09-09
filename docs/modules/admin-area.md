@@ -21,13 +21,35 @@ Configuration includes:
 - Public careers hero headline/body copy
 - Career site enabled/disabled
 - Client review portal enabled/disabled
-- API keys (Google, OpenAI)
+- API keys (Google, AI provider)
 - Bullhorn API credentials for background export jobs
 - SMTP/email configuration
 - Storage configuration (S3/local fallback)
 - Demo mode visibility/lock behavior
 - System diagnostics and test email tools
 - Recent inbound email event visibility inside diagnostics
+
+### AI Provider
+The AI features (resume parsing, candidate summaries, match explanations, email
+drafts, interview questions, submission write-ups, job posting enhancement) all
+run through one provider, selected in `Platform Settings`:
+
+- `AI Provider` — `OpenAI` or `Google Gemini`. Gemini is reached through Google's
+  OpenAI-compatible endpoint, so both use the same request format and the same
+  API key field; only the base URL and model differ.
+- `AI API Key` — a key belonging to the selected provider. An OpenAI key will not
+  work against Gemini or vice versa, so change both together.
+- `AI Model` — optional. Blank uses the provider default (`gpt-4o-mini` for
+  OpenAI, `gemini-2.5-flash` for Gemini).
+
+A record saved before this setting existed has no provider stored, which reads
+as OpenAI — existing keys keep working untouched.
+
+Structured replies are requested with a strict JSON schema. Providers differ in
+how much of that they honour, so a schema rejection is retried once in plain
+JSON mode with the schema restated in the prompt. Every response is validated
+against the feature's own schema regardless, so a provider that ignores the
+requested format produces a clean error rather than corrupt data.
 
 When demo mode is enabled:
 - the branding card remains editable and saveable

@@ -6,7 +6,7 @@ import { parseJsonBody, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
 import { createRecordId } from '@/lib/record-id';
 import { logCreate, logUpdate } from '@/lib/audit-log';
-import { generateMatchExplanationWithOpenAi } from '@/lib/openai-match-explanation';
+import { generateMatchExplanationWithAi } from '@/lib/ai-match-explanation';
 import { withApiLogging } from '@/lib/api-logging';
 
 function parsePositiveInt(value) {
@@ -145,7 +145,7 @@ async function postMatch_explanationsHandler(req) {
 			return NextResponse.json({ error: 'Candidate or job order not found.' }, { status: 404 });
 		}
 
-		const generated = await generateMatchExplanationWithOpenAi({
+		const generated = await generateMatchExplanationWithAi({
 			candidate,
 			jobOrder,
 			scorePercent,
