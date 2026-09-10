@@ -45,7 +45,8 @@ function buildMatchRow({ candidate, jobOrder, templateCriteria, skills, overlay 
 			key: criterion.key,
 			label: criterion.label,
 			weight: criterion.weight,
-			evaluatorKey: criterion.evaluatorKey
+			evaluatorKey: criterion.evaluatorKey,
+			options: criterion.options || {}
 		})),
 		...scored
 	};

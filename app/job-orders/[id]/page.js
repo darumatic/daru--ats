@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowUpRight, ChevronLeft, ChevronRight, GripVertical, MoreVertical, Plus, RefreshCcw, Sparkles, SquareKanban, Trash2, UserPlus } from 'lucide-react';
+import { ArrowUpRight, ChevronLeft, ChevronRight, Gauge, GripVertical, MoreVertical, Plus, RefreshCcw, Sparkles, SquareKanban, Trash2, UserPlus } from 'lucide-react';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
@@ -15,6 +15,8 @@ import ListSortControls from '@/app/components/list-sort-controls';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
 import ActivityTimeline from '@/app/components/activity-timeline';
 import MatchExplanationModal from '@/app/components/match-explanation-modal';
+import MatchScoreBreakdownModal from '@/app/components/match-score-breakdown-modal';
+import MatchCriteriaEditor from '@/app/components/match-criteria-editor';
 import ClientPortalModal from '@/app/components/client-portal-modal';
 import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
@@ -68,6 +70,7 @@ const initialForm = {
 	salaryMax: '',
 	publishToCareerSite: false,
 	applicationQuestions: [],
+	matchCriteria: null,
 	customFields: {}
 };
 
@@ -128,6 +131,7 @@ function toForm(row) {
 		salaryMax: row.salaryMax == null ? '' : formatCurrencyInput(String(row.salaryMax), currency),
 		publishToCareerSite: Boolean(row.publishToCareerSite),
 		applicationQuestions: Array.isArray(row.applicationQuestions) ? row.applicationQuestions : [],
+		matchCriteria: row.matchCriteria || null,
 		customFields:
 			row.customFields && typeof row.customFields === 'object' && !Array.isArray(row.customFields)
 				? row.customFields
@@ -208,9 +212,15 @@ export default function JobOrderDetailsPage() {
 		requiredSkillNames: [],
 		totalCandidatesEvaluated: 0,
 		matchEligibility: '',
+		criteria: [],
+		criteriaHash: '',
+		criteriaSource: 'template',
+		templateDrifted: false,
 		matches: [],
 		submittingCandidateId: ''
 	});
+	const [scoreBreakdownTarget, setScoreBreakdownTarget] = useState(null);
+	const [scoringState, setScoringState] = useState({ running: false, error: '' });
 	const detailsPanelRef = useRef(null);
 	const actionsMenuRef = useRef(null);
 	const { requestConfirm, requestConfirmWithOptions } = useConfirmDialog();
@@ -361,6 +371,42 @@ export default function JobOrderDetailsPage() {
 		setLoading(false);
 	}
 
+	// Scoring one candidate and scoring the visible list are the same request
+	// shape, so the row action and the toolbar button share a handler.
+	async function onScoreCandidates(candidateIds) {
+		if (!id || !Array.isArray(candidateIds) || candidateIds.length === 0) return;
+		setScoringState({ running: true, error: '' });
+		try {
+			const res = await fetch(`/api/job-orders/${id}/match-scores`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ candidateIds })
+			});
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				setScoringState({ running: false, error: data?.error || 'Failed to score candidates.' });
+				toast.error(data?.error || 'Failed to score candidates.');
+				return;
+			}
+
+			const failedCount = Array.isArray(data.failed) ? data.failed.length : 0;
+			const skippedCount = Array.isArray(data.skipped) ? data.skipped.length : 0;
+			const parts = [`Scored ${data.scored} candidate${data.scored === 1 ? '' : 's'}`];
+			if (failedCount > 0) parts.push(`${failedCount} failed`);
+			if (skippedCount > 0) parts.push(`${skippedCount} skipped (time limit)`);
+			// Partial outcomes are reported rather than rounded up to success:
+			// a run where half the candidates failed is not a success.
+			if (failedCount > 0 || skippedCount > 0) toast.error(`${parts.join(', ')}.`);
+			else toast.success(`${parts.join(', ')}.`);
+
+			setScoringState({ running: false, error: '' });
+			await loadMatches();
+		} catch {
+			setScoringState({ running: false, error: 'Failed to score candidates.' });
+			toast.error('Failed to score candidates.');
+		}
+	}
+
 	async function loadMatches(options = {}) {
 		if (!id) return;
 		const { keepResults = true } = options;
@@ -392,6 +438,10 @@ export default function JobOrderDetailsPage() {
 			requiredSkillNames: Array.isArray(data.requiredSkillNames) ? data.requiredSkillNames : [],
 			totalCandidatesEvaluated: Number(data.totalCandidatesEvaluated || 0),
 			matchEligibility: data.matchEligibility || '',
+			criteria: Array.isArray(data.criteria) ? data.criteria : [],
+			criteriaHash: data.criteriaHash || '',
+			criteriaSource: data.criteriaSource || 'template',
+			templateDrifted: Boolean(data.templateDrifted),
 			matches: Array.isArray(data.matches) ? data.matches : []
 		}));
 	}
@@ -1545,6 +1595,80 @@ export default function JobOrderDetailsPage() {
 							</FormField>
 						</section>
 						) : null}
+						<section className="form-section">
+							<h4>Scoring Criteria</h4>
+							<FormField
+								label="Use the default template"
+								hint={
+									form.matchCriteria
+										? 'Off: this role is scored against its own criteria and ignores later template changes.'
+										: 'On: this role is scored against the template in Admin Area > Match Criteria.'
+								}
+							>
+								<label className="switch-field">
+									<input
+										type="checkbox"
+										checked={!form.matchCriteria}
+										onChange={async (event) => {
+											if (event.target.checked) {
+												const confirmed = await requestConfirm({
+													message: [
+														'Use the default template for this role?',
+														'',
+														'The criteria set for this role will be discarded and it will follow the default template again.'
+													].join('\n'),
+													confirmLabel: 'Use Template',
+													cancelLabel: 'Keep Custom',
+													isDanger: true
+												});
+												if (!confirmed) return;
+												setForm((f) => ({ ...f, matchCriteria: null }));
+												return;
+											}
+											// Copy the live template in, so specialising starts from
+											// what the role is being scored against right now.
+											setForm((f) => ({
+												...f,
+												matchCriteria: {
+													version: 1,
+													templateHash: matchState.criteriaHash || '',
+													criteria: (matchState.criteria || []).map((criterion) => ({
+														...criterion,
+														id: crypto.randomUUID(),
+														keyLocked: true
+													}))
+												}
+											}));
+										}}
+									/>
+									<span>Follow the default template</span>
+								</label>
+							</FormField>
+
+							{form.matchCriteria ? (
+								<>
+									{matchState.templateDrifted ? (
+										<p className="panel-subtext">
+											The default template has changed since this role was specialised.{' '}
+											<button
+												type="button"
+												className="btn-link"
+												onClick={() => setForm((f) => ({ ...f, matchCriteria: null }))}
+											>
+												Re-apply Template
+											</button>
+										</p>
+									) : null}
+									<MatchCriteriaEditor
+										value={form.matchCriteria.criteria}
+										onChange={(criteria) =>
+											setForm((f) => ({ ...f, matchCriteria: { ...f.matchCriteria, criteria } }))
+										}
+									/>
+								</>
+							) : null}
+						</section>
+
 					<CustomFieldsSection
 						moduleKey="jobOrders"
 						values={form.customFields}
@@ -1987,6 +2111,24 @@ export default function JobOrderDetailsPage() {
 										className={matchState.loading ? 'btn-refresh-icon-svg row-action-icon-spinner' : 'btn-refresh-icon-svg'}
 									/>
 								</button>
+								<button
+									type="button"
+									className="btn-secondary"
+									onClick={() => onScoreCandidates(sortedMatches.map((match) => match.candidateId))}
+									disabled={
+										!aiAvailable ||
+										scoringState.running ||
+										matchState.loading ||
+										sortedMatches.length === 0
+									}
+									title={
+										aiAvailable
+											? 'Score the listed candidates with AI'
+											: 'Add an AI key in Admin Area > System Settings to use this.'
+									}
+								>
+									{scoringState.running ? 'Scoring…' : 'Score All With AI'}
+								</button>
 								{matchState.computedAt ? (
 									<span className="form-actions-meta">
 										<span>Updated:</span>
@@ -1994,6 +2136,7 @@ export default function JobOrderDetailsPage() {
 									</span>
 								) : null}
 							</div>
+							{scoringState.error ? <p className="panel-subtext error">{scoringState.error}</p> : null}
 							{!matchState.matchEligibility && matchState.requiredSkillNames.length > 0 ? (
 								<p className="panel-subtext">
 									Required skills inferred: {matchState.requiredSkillNames.join(', ')}
@@ -2041,8 +2184,23 @@ export default function JobOrderDetailsPage() {
 																<p>
 																	{match.currentJobTitle || 'No current title'} | Owner: {match.ownerName || '-'}
 																</p>
-																<p>
-																	Match score: <strong>{match.scorePercent}%</strong>
+																<p className="match-score-summary">
+																	<button
+																		type="button"
+																		className="btn-link"
+																		onClick={() => setScoreBreakdownTarget(match)}
+																	>
+																		Match score:{' '}
+																		<strong>
+																			{Number.isFinite(Number(match.scorePercent))
+																				? `${match.scorePercent}%`
+																				: 'Not scored'}
+																		</strong>
+																	</button>
+																	<span className="match-score-coverage">
+																		{match.coveragePercent ?? 0}% of criteria assessed
+																		{match.hasAiScore ? ' · AI' : ''}
+																	</span>
 																</p>
 																{Array.isArray(match.reasons) && match.reasons.length > 0 ? (
 																	<p>{match.reasons.join(' • ')}</p>
@@ -2069,6 +2227,20 @@ export default function JobOrderDetailsPage() {
 																		disabled={!aiAvailable || matchState.loading}
 																	>
 																		<Sparkles aria-hidden="true" className="row-action-lucide" />
+																	</button>
+																	<button
+																		type="button"
+																		className="row-action-icon"
+																		aria-label="Score with AI"
+																		title={
+																			aiAvailable
+																				? 'Score this candidate with AI'
+																				: 'Add an AI key in Admin Area > System Settings to use this.'
+																		}
+																		onClick={() => onScoreCandidates([match.candidateId])}
+																		disabled={!aiAvailable || matchState.loading || scoringState.running}
+																	>
+																		<Gauge aria-hidden="true" className="row-action-lucide" />
 																	</button>
 																	<SaveActionButton
 																		type="button"
@@ -2123,6 +2295,19 @@ export default function JobOrderDetailsPage() {
 				scorePercent={matchExplanationTarget?.scorePercent}
 				reasons={matchExplanationTarget?.reasons}
 				risks={matchExplanationTarget?.risks}
+			/>
+			<MatchScoreBreakdownModal
+				open={Boolean(scoreBreakdownTarget)}
+				onClose={() => setScoreBreakdownTarget(null)}
+				candidateId={scoreBreakdownTarget?.candidateId}
+				candidateName={scoreBreakdownTarget?.candidateName}
+				jobOrderId={Number(id)}
+				jobOrderTitle={jobOrder?.title}
+				scorePercent={scoreBreakdownTarget?.scorePercent}
+				coveragePercent={scoreBreakdownTarget?.coveragePercent}
+				criteriaResults={scoreBreakdownTarget?.criteriaResults}
+				aiAvailable={aiAvailable}
+				onScored={() => loadMatches()}
 			/>
 		</section>
 	);

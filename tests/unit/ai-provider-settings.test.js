@@ -126,3 +126,47 @@ describe('integration settings AI resolution', () => {
 		expect(serializeAdminSystemSettings({ aiApiKey: '' }).aiAvailable).toBe(false);
 	});
 });
+
+// The reasoning model is deliberately a second, optional model used only by
+// candidate scoring. Blank must mean "off" rather than falling back to a
+// provider default, or every install would start paying for a reasoning model
+// nobody asked for.
+describe('reasoning model resolution', () => {
+	beforeEach(() => {
+		clearSystemSettingsCache();
+	});
+
+	afterEach(() => {
+		clearSystemSettingsCache();
+	});
+
+	it('is empty on a row that has never set one', async () => {
+		const settings = await settingsFor({ aiApiKey: 'sk-existing' });
+
+		expect(settings.aiReasoningModel).toBe('');
+	});
+
+	it('does not inherit the standard model or the provider default', async () => {
+		const settings = await settingsFor({ aiApiKey: 'sk', aiModel: 'gpt-4o', aiProvider: 'openai' });
+
+		expect(settings.aiModel).toBe('gpt-4o');
+		expect(settings.aiReasoningModel).toBe('');
+	});
+
+	it('carries a configured reasoning model through', async () => {
+		const settings = await settingsFor({ aiApiKey: 'sk', aiModel: 'gpt-4o-mini', aiReasoningModel: '  o3  ' });
+
+		expect(settings.aiReasoningModel).toBe('o3');
+		expect(settings.aiModel).toBe('gpt-4o-mini');
+	});
+
+	it('exposes it to administrators alongside the standard model', () => {
+		const serialized = serializeAdminSystemSettings({
+			aiApiKey: 'sk',
+			aiModel: 'gpt-4o-mini',
+			aiReasoningModel: 'o3'
+		});
+
+		expect(serialized.aiReasoningModel).toBe('o3');
+	});
+});

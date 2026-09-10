@@ -11,6 +11,7 @@ export default function AdminPage() {
 		users: 0,
 		skills: 0,
 		customFields: 0,
+		matchCriteria: 0,
 		apiErrors: 0
 	});
 	const [billingEnabled, setBillingEnabled] = useState(false);
@@ -19,14 +20,16 @@ export default function AdminPage() {
 		let cancelled = false;
 
 		async function load() {
-			const [divisionRes, userRes, skillRes, customFieldRes, errorRes, billingRes] = await Promise.all([
-				fetch('/api/divisions'),
-				fetch('/api/users'),
-				fetch('/api/skills'),
-				fetch('/api/admin/custom-fields?includeInactive=true'),
-				fetch('/api/admin/error-logs?limit=1'),
-				fetch('/api/admin/billing/summary', { cache: 'no-store' })
-			]);
+			const [divisionRes, userRes, skillRes, customFieldRes, matchCriteriaRes, errorRes, billingRes] =
+				await Promise.all([
+					fetch('/api/divisions'),
+					fetch('/api/users'),
+					fetch('/api/skills'),
+					fetch('/api/admin/custom-fields?includeInactive=true'),
+					fetch('/api/admin/match-criteria'),
+					fetch('/api/admin/error-logs?limit=1'),
+					fetch('/api/admin/billing/summary', { cache: 'no-store' })
+				]);
 
 			if (!divisionRes.ok || !userRes.ok || !skillRes.ok || !customFieldRes.ok || !errorRes.ok) return;
 
@@ -36,6 +39,9 @@ export default function AdminPage() {
 				skillRes.json(),
 				customFieldRes.json()
 			]);
+			// Tolerated rather than gating the whole panel: an install that has not
+			// run the criteria migration yet should still see the rest of Admin.
+			const matchCriteriaData = matchCriteriaRes.ok ? await matchCriteriaRes.json().catch(() => []) : [];
 			const errorData = await errorRes.json().catch(() => ({}));
 			const billingData = billingRes.ok ? await billingRes.json().catch(() => ({})) : {};
 			if (cancelled) return;
@@ -45,6 +51,7 @@ export default function AdminPage() {
 				users: Array.isArray(userData) ? userData.length : 0,
 				skills: Array.isArray(skillData) ? skillData.length : 0,
 				customFields: Array.isArray(customFieldData) ? customFieldData.length : 0,
+				matchCriteria: Array.isArray(matchCriteriaData) ? matchCriteriaData.length : 0,
 				apiErrors: Number.isInteger(errorData?.total) ? errorData.total : 0
 			});
 			setBillingEnabled(Boolean(billingData?.config?.enabled));
@@ -138,6 +145,11 @@ export default function AdminPage() {
 								href: '/admin/custom-fields',
 								label: 'Custom Fields',
 								value: counts.customFields
+							})}
+							{renderAdminCard({
+								href: '/admin/match-criteria',
+								label: 'Match Criteria',
+								value: counts.matchCriteria
 							})}
 						</div>
 					</article>

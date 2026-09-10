@@ -136,6 +136,9 @@ async function parseBody(req) {
 				? asTrimmedString(formData.get('aiProvider'))
 				: undefined,
 			aiModel: formData.has('aiModel') ? asTrimmedString(formData.get('aiModel')) : undefined,
+			aiReasoningModel: formData.has('aiReasoningModel')
+				? asTrimmedString(formData.get('aiReasoningModel'))
+				: undefined,
 			smtpHost: formData.has('smtpHost') ? asTrimmedString(formData.get('smtpHost')) : undefined,
 			smtpPort: formData.has('smtpPort') ? asTrimmedString(formData.get('smtpPort')) : undefined,
 			smtpSecure: formData.has('smtpSecure') ? toBoolean(formData.get('smtpSecure')) : undefined,
@@ -194,6 +197,7 @@ async function parseBody(req) {
 				aiApiKey: formData.has('aiApiKey'),
 				aiProvider: formData.has('aiProvider'),
 				aiModel: formData.has('aiModel'),
+				aiReasoningModel: formData.has('aiReasoningModel'),
 				smtpHost: formData.has('smtpHost'),
 				smtpPort: formData.has('smtpPort'),
 				smtpSecure: formData.has('smtpSecure'),
@@ -247,6 +251,9 @@ async function parseBody(req) {
 			? asTrimmedString(body?.aiProvider)
 			: undefined,
 		aiModel: hasOwnProperty(body, 'aiModel') ? asTrimmedString(body?.aiModel) : undefined,
+		aiReasoningModel: hasOwnProperty(body, 'aiReasoningModel')
+			? asTrimmedString(body?.aiReasoningModel)
+			: undefined,
 		smtpHost: hasOwnProperty(body, 'smtpHost') ? asTrimmedString(body?.smtpHost) : undefined,
 		smtpPort: hasOwnProperty(body, 'smtpPort') ? asTrimmedString(body?.smtpPort) : undefined,
 		smtpSecure: hasOwnProperty(body, 'smtpSecure') ? Boolean(body?.smtpSecure) : undefined,
@@ -305,6 +312,7 @@ async function parseBody(req) {
 			aiApiKey: hasOwnProperty(body, 'aiApiKey'),
 			aiProvider: hasOwnProperty(body, 'aiProvider'),
 			aiModel: hasOwnProperty(body, 'aiModel'),
+			aiReasoningModel: hasOwnProperty(body, 'aiReasoningModel'),
 			smtpHost: hasOwnProperty(body, 'smtpHost'),
 			smtpPort: hasOwnProperty(body, 'smtpPort'),
 			smtpSecure: hasOwnProperty(body, 'smtpSecure'),
@@ -636,6 +644,11 @@ async function patchSystem_settingsHandler(req) {
 		aiModel: input.aiModel === undefined
 			? existing?.aiModel || null
 			: input.aiModel || null,
+		// Blank clears it, which turns candidate scoring back to the standard
+		// model rather than leaving a stale reasoning model in place.
+		aiReasoningModel: input.aiReasoningModel === undefined
+			? existing?.aiReasoningModel || null
+			: input.aiReasoningModel || null,
 		smtpHost: input.smtpHost === undefined
 			? existing?.smtpHost || null
 			: input.smtpHost || null,

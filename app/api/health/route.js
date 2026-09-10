@@ -69,6 +69,7 @@ async function buildIntegrationHealth() {
 				&& buildPresenceFlag(integrationSettings.smtpUser),
 			aiProvider: integrationSettings.aiProvider || 'default',
 			aiModel: integrationSettings.aiModel || 'default',
+			aiReasoningModel: integrationSettings.aiReasoningModel || 'default',
 			careerSiteEnabled: Boolean(integrationSettings.careerSiteEnabled),
 			objectStorageMode: objectStorage.mode,
 			objectStorageConfigured
@@ -80,6 +81,7 @@ async function buildIntegrationHealth() {
 			smtp: false,
 			aiProvider: 'default',
 			aiModel: 'default',
+			aiReasoningModel: 'default',
 			careerSiteEnabled: false,
 			objectStorageMode: 'local',
 			objectStorageConfigured: false

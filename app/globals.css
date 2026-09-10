@@ -11302,3 +11302,145 @@ small {
 	padding-left: 0.42rem;
 	padding-right: 0.42rem;
 }
+
+/* Match criteria editor -------------------------------------------------- */
+.match-criteria-editor {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.match-criteria-row {
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	padding: 0.6rem 0.7rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+}
+
+.match-criteria-row-main {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+.match-criteria-label {
+	flex: 1 1 12rem;
+	min-width: 8rem;
+}
+
+.match-criteria-evaluator {
+	flex: 0 1 12rem;
+}
+
+.match-criteria-weight {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.match-criteria-weight input {
+	width: 4.5rem;
+}
+
+.match-criteria-share {
+	font-size: 0.75rem;
+	color: var(--muted);
+	min-width: 2.5rem;
+}
+
+.match-criteria-hint {
+	margin: 0;
+	font-size: 0.75rem;
+}
+
+.match-criteria-reference,
+.match-criteria-radius,
+.match-criteria-degrees {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	font-size: 0.8rem;
+}
+
+.match-criteria-radius {
+	flex-direction: row;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.match-criteria-radius input {
+	width: 5rem;
+}
+
+.match-criteria-degrees {
+	flex-direction: row;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+}
+
+.match-criteria-degrees label {
+	display: flex;
+	align-items: center;
+	gap: 0.3rem;
+}
+
+.match-criteria-footer {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	flex-wrap: wrap;
+}
+
+/* Match score breakdown -------------------------------------------------- */
+.match-score-summary {
+	display: flex;
+	align-items: baseline;
+	gap: 0.4rem;
+	flex-wrap: wrap;
+}
+
+.match-score-coverage {
+	font-size: 0.75rem;
+	color: var(--muted);
+}
+
+.match-score-rows {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.match-score-row {
+	display: grid;
+	grid-template-columns: minmax(7rem, 1fr) 3rem 1fr;
+	align-items: center;
+	gap: 0.5rem;
+	font-size: 0.8rem;
+}
+
+.match-score-row-unassessed {
+	opacity: 0.7;
+}
+
+.match-score-meter {
+	background: var(--border);
+	border-radius: 999px;
+	height: 6px;
+	overflow: hidden;
+}
+
+.match-score-meter-fill {
+	background: var(--accent);
+	height: 100%;
+	border-radius: 999px;
+}
+
+.match-score-basis {
+	grid-column: 1 / -1;
+	font-size: 0.72rem;
+	color: var(--muted);
+	margin: 0;
+}

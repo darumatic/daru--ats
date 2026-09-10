@@ -8,6 +8,10 @@ import { createRecordId } from '@/lib/record-id';
 import { logCreate, logUpdate } from '@/lib/audit-log';
 import { generateMatchExplanationWithAi } from '@/lib/ai-match-explanation';
 import { withApiLogging } from '@/lib/api-logging';
+import { buildJobText, findJobSkillIds } from '@/lib/match-scoring';
+import { resolveEffectiveCriteria } from '@/lib/match-criteria';
+import { scoreCandidateForJobOrder } from '@/lib/match-criteria-evaluators';
+import { getMatchCriteriaTemplate } from '@/lib/match-criteria-store';
 
 function parsePositiveInt(value) {
 	const parsed = Number.parseInt(String(value ?? '').trim(), 10);
@@ -44,6 +48,32 @@ function buildInclude() {
 				}
 			}
 		}
+	};
+}
+
+async function computeExplanationContext({ candidate, jobOrder }) {
+	const [templateCriteria, skills] = await Promise.all([
+		getMatchCriteriaTemplate(),
+		prisma.skill.findMany({ where: { isActive: true }, select: { id: true, name: true } })
+	]);
+	const { criteria } = resolveEffectiveCriteria({ jobOrder, templateCriteria });
+	const overlay = await prisma.candidateJobScore.findUnique({
+		where: { candidateId_jobOrderId: { candidateId: candidate.id, jobOrderId: jobOrder.id } }
+	});
+
+	const scored = scoreCandidateForJobOrder({
+		candidate,
+		jobOrder,
+		criteria,
+		skills,
+		requiredSkillIds: findJobSkillIds(buildJobText(jobOrder), skills),
+		overlay
+	});
+
+	return {
+		scorePercent: scored.scorePercent,
+		reasons: scored.reasons.slice(0, 8),
+		risks: scored.risks.slice(0, 8)
 	};
 }
 
@@ -131,9 +161,6 @@ async function postMatch_explanationsHandler(req) {
 		const body = await parseJsonBody(req);
 		const candidateId = parsePositiveInt(body?.candidateId);
 		const jobOrderId = parsePositiveInt(body?.jobOrderId);
-		const scorePercent = Number.isFinite(Number(body?.scorePercent)) ? Math.max(0, Math.min(100, Math.round(Number(body.scorePercent)))) : null;
-		const reasons = Array.isArray(body?.reasons) ? body.reasons.map((value) => String(value || '').trim()).filter(Boolean).slice(0, 8) : [];
-		const risks = Array.isArray(body?.risks) ? body.risks.map((value) => String(value || '').trim()).filter(Boolean).slice(0, 8) : [];
 
 		if (!candidateId || !jobOrderId) {
 			return NextResponse.json({ error: 'candidateId and jobOrderId are required.' }, { status: 400 });
@@ -144,6 +171,12 @@ async function postMatch_explanationsHandler(req) {
 		if (!candidate || !jobOrder) {
 			return NextResponse.json({ error: 'Candidate or job order not found.' }, { status: 404 });
 		}
+
+		// The score, reasons and risks used to be taken from the request body,
+		// which meant a caller could write any number and then have the model
+		// explain it. They are recomputed here instead, so the prose and the
+		// number can never disagree and neither is caller-controlled.
+		const { scorePercent, reasons, risks } = await computeExplanationContext({ candidate, jobOrder });
 
 		const generated = await generateMatchExplanationWithAi({
 			candidate,

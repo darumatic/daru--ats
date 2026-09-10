@@ -16,6 +16,7 @@ import ListSortControls from '@/app/components/list-sort-controls';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
 import ActivityTimeline from '@/app/components/activity-timeline';
 import MatchExplanationModal from '@/app/components/match-explanation-modal';
+import MatchScoreBreakdownModal from '@/app/components/match-score-breakdown-modal';
 import EmailDraftModal from '@/app/components/email-draft-modal';
 import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
@@ -341,6 +342,7 @@ export default function CandidateDetailsPage() {
 	const [attachmentInputKey, setAttachmentInputKey] = useState(0);
 	const [workspaceTab, setWorkspaceTab] = useState('status-history');
 	const [matchExplanationTarget, setMatchExplanationTarget] = useState(null);
+	const [scoreBreakdownTarget, setScoreBreakdownTarget] = useState(null);
 	const [summaryState, setSummaryState] = useState({ generating: false });
 	const [aiAvailable, setAiAvailable] = useState(false);
 	const [detailsPanelHeight, setDetailsPanelHeight] = useState(0);
@@ -2800,8 +2802,23 @@ export default function CandidateDetailsPage() {
 																		{match.clientName || '-'}
 																		{match.contactName ? ` | ${match.contactName}` : ''}
 																	</p>
-																	<p>
-																		Match score: <strong>{match.scorePercent}%</strong>
+																	<p className="match-score-summary">
+																		<button
+																			type="button"
+																			className="btn-link"
+																			onClick={() => setScoreBreakdownTarget(match)}
+																		>
+																			Match score:{' '}
+																			<strong>
+																				{Number.isFinite(Number(match.scorePercent))
+																					? `${match.scorePercent}%`
+																					: 'Not scored'}
+																			</strong>
+																		</button>
+																		<span className="match-score-coverage">
+																			{match.coveragePercent ?? 0}% of criteria assessed
+																			{match.hasAiScore ? ' · AI' : ''}
+																		</span>
 																	</p>
 																	{Array.isArray(match.reasons) && match.reasons.length > 0 ? (
 																		<p>{match.reasons.join(' • ')}</p>
@@ -2998,6 +3015,19 @@ export default function CandidateDetailsPage() {
 				scorePercent={matchExplanationTarget?.scorePercent}
 				reasons={matchExplanationTarget?.reasons}
 				risks={matchExplanationTarget?.risks}
+			/>
+			<MatchScoreBreakdownModal
+				open={Boolean(scoreBreakdownTarget)}
+				onClose={() => setScoreBreakdownTarget(null)}
+				candidateId={Number(id)}
+				candidateName={candidate ? `${candidate.firstName} ${candidate.lastName}`.trim() : ''}
+				jobOrderId={scoreBreakdownTarget?.jobOrderId}
+				jobOrderTitle={scoreBreakdownTarget?.jobOrderTitle}
+				scorePercent={scoreBreakdownTarget?.scorePercent}
+				coveragePercent={scoreBreakdownTarget?.coveragePercent}
+				criteriaResults={scoreBreakdownTarget?.criteriaResults}
+				aiAvailable={aiAvailable}
+				onScored={() => loadJobMatches()}
 			/>
 		</section>
 	);

@@ -72,6 +72,16 @@ Each job order has its own Kanban board at `/job-orders/{id}/pipeline`. It opens
 - Duplicate candidate+job submissions are blocked.
 - Candidate typeahead is optimized for larger datasets and qualification filtering.
 - Candidate match rows support `Explain Match`, which opens a saved AI explanation of fit, gaps, and recruiter validation points for that candidate/job pair.
+
+## Match Scoring
+- A match score is a weighted set of **criteria**, not a fixed formula. The default set is defined in `Admin Area > Match Criteria` and every job order inherits it.
+- Weights are **relative, not percentages**. They never have to add up to 100; the engine normalises them and the editor shows each criterion's derived share. This is so adding a criterion does not mean re-editing every other one.
+- To score one role differently, turn off `Use the default template` on the job order. That copies the current criteria onto the job and stops it tracking template edits, so a later change to the template cannot rewrite a role you have tuned. If the template moves on afterwards, the job shows a `Re-apply Template` hint.
+- A criterion the rules engine cannot judge is shown as **not assessed** and left out of the weighted average entirely - it is not scored zero. The row reports coverage next to the score (`72% from 3 of 5 criteria`) so a number resting on partial evidence is legible as such. A candidate no criterion could be assessed for reads `Not scored`, never `0%`.
+- `Big Company` and `University` ship with empty reference lists, so they stay unassessed until you list the employers or schools that matter to your market (or run an AI pass). That is deliberate: a bundled Fortune-500 or university ranking would be a maintenance burden and would not match your desk.
+- `Score with AI` on one row, or `Score All With AI` in the Matches toolbar, asks the model to judge the criteria the rules engine could not. The result is saved for that candidate/job pair and shown in place of the rule score while it stays fresh. A batch covers at most 25 candidates and is **refused** above that rather than quietly truncated.
+- A saved AI judgement is stamped per criterion. Changing a criterion's **weight** keeps it - only redefining the criterion (its evaluator or its options) invalidates that one judgement, so re-weighting never costs you a re-run.
+- Editing the candidate or the job order marks a saved score stale. Nothing re-scores on its own; re-run it when you want it refreshed.
 - If no AI provider is configured, `Explain Match` remains visible but disabled with a tooltip/hint.
 
 ## Bulk Close From The List

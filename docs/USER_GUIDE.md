@@ -156,6 +156,7 @@ AI summary:
 	- suggested next step
 - Can be refreshed from the modal.
 - Matched job orders also support `Explain Match`, which stores a reusable explanation of fit, likely gaps, and what the recruiter should validate.
+- Each matched job order is scored against its own criteria, so a candidate's list can legitimately mix jobs using the default template with jobs that have specialised theirs. The breakdown on each row names the criteria it used.
 
 Profile completeness:
 - Shown in the candidate snapshot card.
@@ -241,6 +242,11 @@ Submission workflow:
 - Duplicate submissions for same candidate + job are blocked.
 - Candidate suggestions use qualification scoring and typeahead safeguards.
 - Candidate matches support `Explain Match`, which opens a saved AI explanation for why a candidate fits, where the gaps are, and what to validate before submitting.
+- The match score is a weighted set of criteria you control. Click the score to see the per-criterion breakdown: what each criterion scored, how much weight it carries, and whether it was judged by the rules or by AI.
+- A criterion the system cannot honestly judge is shown as `not assessed` and left out of the score rather than counted as zero, so the row also reports coverage (`72% from 3 of 5 criteria`). A candidate nothing could be assessed for shows `Not scored`.
+- To score one role differently from the rest, turn off `Use the default template` in the job order's `Scoring Criteria` section and adjust the weights or the list. That job then keeps its own set; use `Re-apply Template` if you later want it back in line.
+- `Score with AI` on a row asks the model to judge the criteria the rules could not - typically Big Company and University. `Score All With AI` does the same for up to 25 candidates at once. Scores are saved, so this is a one-off cost per candidate until the record or the criteria change.
+- Nothing re-scores by itself. A saved score is marked stale when the candidate, the job order or the criteria change; re-run it when you want it refreshed.
 - Use `Actions > Client Review Portal` to create, copy, email, open, revoke, or restore the persistent client-facing magic link for the assigned hiring contact, with portal analytics on job order detail and in the modal showing sent, opened, last viewed, and acted-on status.
 - Sending the portal link from the modal uses a branded email invite that follows the selected theme, with a direct portal CTA and job context for the client contact.
 - In the client portal, hiring managers can save structured scorecards for `Communication`, `Technical Fit`, `Culture Fit`, and `Overall Recommendation` alongside comments or interview/pass actions.

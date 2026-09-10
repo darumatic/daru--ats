@@ -49,6 +49,10 @@ When demo mode is enabled, authenticated demo users see a one-time welcome modal
 - Candidate list profile-completeness chips plus soft submission warnings when recruiters try to submit thin profiles
 - AI-generated submission write-ups for polished client-facing candidate introductions
 - AI-generated interview question sets stored on the interview record and refreshable on demand
+- Weighted, admin-editable match criteria (JD Criteria Match, Location, Local Experience, Big Company, University out of the box) that each job order can specialise for its own role
+- Honest coverage reporting: a criterion the rules engine cannot judge is marked `not assessed` and left out of the weighted average rather than scored zero, and an unscoreable candidate reads `Not scored` instead of 0%
+- On-demand AI scoring per candidate and a capped `Score All With AI` per job order, cached per candidate/job pair and superseding the rule score while it stays fresh
+- Optional reasoning model used only by candidate scoring, so the rest of the AI features keep the standard model
 - AI match explanations on candidate/job-order match lists with cached, refreshable fit analysis that auto-generates on first open
 - AI email drafting from candidate and contact actions menus with purpose/tone controls and copy-to-clipboard
 - AI editor actions use the shared sparkles icon pattern for consistency across candidate and job-order detail views
@@ -59,7 +63,7 @@ When demo mode is enabled, authenticated demo users see a one-time welcome modal
 - Candidate file attachments with object storage (`s3`) and local fallback
 - Candidate file workspace supports explicit resume labeling so internal users and the client portal can identify the primary resume document
 - Public career site (toggleable in Admin settings) with quick apply + resume upload
-- Candidate and job-order match workspaces (top matches, sortable/paged)
+- Candidate and job-order match workspaces (top matches, sortable/paged) with a per-criterion score breakdown
 - Administrator-only audit trails on records plus admin diagnostics
 - Admin diagnostics includes recent inbound email webhook visibility
 - Admin data export module with `JSON`, `NDJSON`, and `ZIP (per-entity)` Hire Gnome output + a Bullhorn API batch ZIP exporter for bounded migration samples
@@ -280,6 +284,14 @@ Use `.env` for:
 | `LOOKUP_RATE_LIMIT_WINDOW_SECONDS` | `60` | Lookup/typeahead rate-limit window size. |
 | `GLOBAL_SEARCH_RATE_LIMIT_MAX_REQUESTS` | `30` | Max global search requests per window. |
 | `GLOBAL_SEARCH_RATE_LIMIT_WINDOW_SECONDS` | `60` | Global search rate-limit window size. |
+| `MATCH_LIST_MAX_CANDIDATE_POOL` | `500` | Most candidates a single match list will score, most recently updated first. |
+| `MATCH_SCORE_BATCH_MAX_CANDIDATES` | `25` | Most candidates one `Score All With AI` run may cover. Requests above this are refused, not truncated. |
+| `MATCH_SCORE_BATCH_CONCURRENCY` | `3` | Scoring calls run at once during a batch. |
+| `MATCH_SCORE_BATCH_DEADLINE_SECONDS` | `100` | Wall clock after which a batch starts no further work and reports the rest as skipped. |
+| `MATCH_SCORE_BATCH_RATE_LIMIT_MAX_REQUESTS` | `6` | Batch-scoring runs per window. |
+| `MATCH_SCORE_BATCH_RATE_LIMIT_WINDOW_SECONDS` | `600` | Batch-scoring rate-limit window size. |
+| `AI_REQUEST_TIMEOUT_SECONDS` | `60` | Timeout for an AI request. |
+| `AI_REASONING_REQUEST_TIMEOUT_SECONDS` | `180` | Timeout when the reasoning model is in use. |
 | `CANDIDATE_MATCH_RATE_LIMIT_MAX_REQUESTS` | `20` | Candidate-match endpoint max requests per window. |
 | `CANDIDATE_MATCH_RATE_LIMIT_WINDOW_SECONDS` | `60` | Candidate-match rate-limit window size. |
 | `JOB_ORDER_MATCH_RATE_LIMIT_MAX_REQUESTS` | `20` | Job-order-match endpoint max requests per window. |

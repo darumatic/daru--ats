@@ -44,6 +44,13 @@ run through one provider, selected in `Platform Settings`:
   environment variable still overrides that default, but only while the provider
   is OpenAI: it names an OpenAI model, so on any other provider it would be sent
   verbatim and rejected.
+- `Reasoning Model` — optional, and used **only** by candidate scoring; every
+  other AI feature keeps using `AI Model`. Blank means "use the same model":
+  unlike `AI Model` it does not fall back to a provider default, so no install
+  starts paying for a reasoning model by accident. Models that reject a chosen
+  temperature (the o-series, GPT-5, `*-thinking`) are recognised by name and
+  sent none; the client also retries once without temperature when a provider
+  rejects it, so a model newer than this build still works.
 
 A record saved before this setting existed has no provider stored, which reads
 as OpenAI — existing keys keep working untouched.
@@ -207,6 +214,14 @@ Defines organizational boundaries and collaboration mode:
 
 ## Skills
 Maintains standardized selectable skill options used by candidate records and matching.
+
+## Match Criteria
+- `Admin Area > Match Criteria` defines the weighted criteria every candidate match is scored against. It is seeded with JD Criteria Match, Location, Local Experience, Big Company and University.
+- Each criterion carries a label, a **weight** (relative, not a percentage), an **evaluator** naming how it is scored, and options for evaluators that need them.
+- Evaluators: `jd_criteria_match` (skills, title and keyword alignment - this is the heuristic that used to be the entire match score), `location` (distance against a radius, falling back to city/state text), `local_experience`, `big_company`, `university`, `experience_years` and `skills_coverage`.
+- `big_company` and `university` need a reference list before they can be scored deterministically - the employers or schools that matter to your market. Left empty they report `not assessed`, which lowers the coverage figure on every match rather than inventing a score.
+- Removing a criterion is a **soft delete**. Stored score breakdowns name the criteria they were computed against, so the row is deactivated rather than deleted. Deactivating every criterion does not trigger a re-seed of the defaults.
+- Any change here takes effect within 30 seconds (the template is cached) and is reflected in match lists immediately, since the cache key includes the criteria.
 
 ## Custom Fields
 Admins can define additional fields for:

@@ -178,6 +178,13 @@ async function getJob_orders_id_matchesHandler(req, { params }) {
 			templateCriteria
 		});
 		const criteriaHash = buildCriteriaSetHash(criteria);
+		const criteriaPayload = criteria.map((criterion) => ({
+			key: criterion.key,
+			label: criterion.label,
+			weight: criterion.weight,
+			evaluatorKey: criterion.evaluatorKey,
+			options: criterion.options || {}
+		}));
 		const cacheKey = buildMatchCacheKey({ jobOrderId: id, includeSubmitted, limit, scope, criteriaHash });
 		const cached = getCachedMatchResponse(cacheKey);
 		if (cached) {
@@ -193,6 +200,10 @@ async function getJob_orders_id_matchesHandler(req, { params }) {
 				activeHiring: false,
 				matchEligibility:
 					`Matches are unavailable while this job order is ${String(jobOrder.status).replaceAll('_', ' ')}.`,
+				criteria: criteriaPayload,
+				criteriaSource,
+				criteriaHash,
+				templateDrifted,
 				matches: []
 			};
 			setCachedMatchResponse(cacheKey, payload);
@@ -278,13 +289,9 @@ async function getJob_orders_id_matchesHandler(req, { params }) {
 			// The criteria in force, so the list can show the weighting it scored
 			// against and flag a job whose specialised set has fallen behind the
 			// template.
-			criteria: criteria.map((criterion) => ({
-				key: criterion.key,
-				label: criterion.label,
-				weight: criterion.weight,
-				evaluatorKey: criterion.evaluatorKey
-			})),
+			criteria: criteriaPayload,
 			criteriaSource,
+			criteriaHash,
 			templateDrifted,
 			matches: sorted
 		};

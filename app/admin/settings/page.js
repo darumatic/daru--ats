@@ -31,6 +31,7 @@ const initialForm = {
 	aiApiKey: '',
 	aiProvider: AI_PROVIDER_OPENAI,
 	aiModel: '',
+	aiReasoningModel: '',
 	objectStorageProvider: 's3',
 	objectStorageRegion: 'us-east-1',
 	objectStorageBucket: '',
@@ -221,6 +222,7 @@ export default function AdminSettingsPage() {
 			|| String(form.aiApiKey || '') !== String(savedForm.aiApiKey || '')
 			|| String(form.aiProvider || '') !== String(savedForm.aiProvider || '')
 			|| String(form.aiModel || '') !== String(savedForm.aiModel || '')
+			|| String(form.aiReasoningModel || '') !== String(savedForm.aiReasoningModel || '')
 			|| String(form.apiErrorLogRetentionDays || '') !== String(savedForm.apiErrorLogRetentionDays || '')
 			|| String(form.smtpHost || '') !== String(savedForm.smtpHost || '')
 			|| String(form.smtpPort || '') !== String(savedForm.smtpPort || '')
@@ -253,6 +255,7 @@ export default function AdminSettingsPage() {
 			form.aiApiKey,
 			form.aiProvider,
 			form.aiModel,
+			form.aiReasoningModel,
 			form.smtpFromEmail,
 			form.smtpFromName,
 			form.smtpHost,
@@ -276,6 +279,7 @@ export default function AdminSettingsPage() {
 			savedForm.aiApiKey,
 			savedForm.aiProvider,
 			savedForm.aiModel,
+			savedForm.aiReasoningModel,
 			savedForm.smtpFromEmail,
 			savedForm.smtpFromName,
 			savedForm.smtpHost,
@@ -312,6 +316,7 @@ export default function AdminSettingsPage() {
 			aiApiKey: data.aiApiKey ?? fallback.aiApiKey ?? '',
 			aiProvider: normalizeAiProvider(data.aiProvider ?? fallback.aiProvider),
 			aiModel: data.aiModel ?? fallback.aiModel ?? '',
+			aiReasoningModel: data.aiReasoningModel ?? fallback.aiReasoningModel ?? '',
 			objectStorageProvider: data.objectStorageProvider || fallback.objectStorageProvider || 's3',
 			objectStorageRegion: data.objectStorageRegion || fallback.objectStorageRegion || 'us-east-1',
 			objectStorageBucket: data.objectStorageBucket ?? fallback.objectStorageBucket ?? '',
@@ -413,6 +418,7 @@ export default function AdminSettingsPage() {
 		payload.set('aiApiKey', form.aiApiKey);
 		payload.set('aiProvider', form.aiProvider);
 		payload.set('aiModel', form.aiModel);
+		payload.set('aiReasoningModel', form.aiReasoningModel);
 		payload.set('apiErrorLogRetentionDays', form.apiErrorLogRetentionDays || '90');
 		payload.set('objectStorageProvider', form.objectStorageProvider);
 		payload.set('objectStorageRegion', form.objectStorageRegion);
@@ -863,6 +869,19 @@ export default function AdminSettingsPage() {
 											setForm((current) => ({ ...current, aiModel: event.target.value }))
 										}
 										placeholder={aiProviderProfile.defaultModel}
+										disabled={demoMode}
+									/>
+								</FormField>
+								<FormField
+									label="Reasoning Model"
+									hint="Optional. Used only for candidate scoring; every other AI feature uses the model above. Leave blank to use the same model."
+								>
+									<input
+										value={form.aiReasoningModel}
+										onChange={(event) =>
+											setForm((current) => ({ ...current, aiReasoningModel: event.target.value }))
+										}
+										placeholder="Same as AI Model"
 										disabled={demoMode}
 									/>
 								</FormField>

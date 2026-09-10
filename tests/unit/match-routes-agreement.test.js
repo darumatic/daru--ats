@@ -213,6 +213,48 @@ describe('job-order match eligibility', () => {
 		expect(prismaMock.candidate.findMany).not.toHaveBeenCalled();
 	});
 
+	it('still reports the criteria for a job order that is not open', async () => {
+		// The job-order editor seeds a specialisation from this list. Omitting it
+		// here would let someone specialise a closed role into an empty criteria
+		// set, which the save then rejects.
+		prismaMock.jobOrder.findFirst.mockResolvedValue({ ...buildJobOrder(109), status: 'closed' });
+
+		const payload = await (
+			await jobOrderMatches(new Request('http://localhost/api/job-orders/109/matches'), {
+				params: Promise.resolve({ id: '109' })
+			})
+		).json();
+
+		expect(payload.matches).toEqual([]);
+		expect(payload.criteria.map((criterion) => criterion.key)).toEqual(
+			DEFAULT_MATCH_CRITERIA.map((criterion) => criterion.key)
+		);
+		expect(payload.criteriaHash).toEqual(expect.any(String));
+	});
+
+	it('carries each criterion\u2019s options, so specialising does not drop a reference list', async () => {
+		getMatchCriteriaTemplate.mockResolvedValue([
+			{
+				key: 'big_company',
+				label: 'Big Company',
+				evaluatorKey: 'big_company',
+				weight: 20,
+				options: { referenceValues: ['Atlassian', 'Canva'] }
+			}
+		]);
+		prismaMock.jobOrder.findFirst.mockResolvedValue(buildJobOrder(110));
+		prismaMock.skill.findMany.mockResolvedValue(SKILLS);
+		prismaMock.candidate.findMany.mockResolvedValue([buildCandidate(70)]);
+
+		const payload = await (
+			await jobOrderMatches(new Request('http://localhost/api/job-orders/110/matches'), {
+				params: Promise.resolve({ id: '110' })
+			})
+		).json();
+
+		expect(payload.criteria[0].options).toEqual({ referenceValues: ['Atlassian', 'Canva'] });
+	});
+
 	it('reports a missing job order as a 404', async () => {
 		prismaMock.jobOrder.findFirst.mockResolvedValue(null);
 
