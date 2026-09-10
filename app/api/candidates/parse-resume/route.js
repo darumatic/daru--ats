@@ -37,7 +37,7 @@ async function parseResumeDraft(resumeText) {
 			parsedSkills: aiResult.parsedSkills || [],
 			educationRecords: aiResult.educationRecords || [],
 			workExperienceRecords: aiResult.workExperienceRecords || [],
-			parser: 'openai'
+			parser: aiResult.provider
 		};
 	}
 

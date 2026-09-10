@@ -40,16 +40,30 @@ run through one provider, selected in `Platform Settings`:
 - `AI API Key` — a key belonging to the selected provider. An OpenAI key will not
   work against Gemini or vice versa, so change both together.
 - `AI Model` — optional. Blank uses the provider default (`gpt-4o-mini` for
-  OpenAI, `gemini-2.5-flash` for Gemini).
+  OpenAI, `gemini-2.5-flash` for Gemini). The legacy `OPENAI_RESUME_MODEL`
+  environment variable still overrides that default, but only while the provider
+  is OpenAI: it names an OpenAI model, so on any other provider it would be sent
+  verbatim and rejected.
 
 A record saved before this setting existed has no provider stored, which reads
 as OpenAI — existing keys keep working untouched.
 
-Structured replies are requested with a strict JSON schema. Providers differ in
-how much of that they honour, so a schema rejection is retried once in plain
-JSON mode with the schema restated in the prompt. Every response is validated
-against the feature's own schema regardless, so a provider that ignores the
-requested format produces a clean error rather than corrupt data.
+Structured replies are requested with a strict JSON schema. Google's
+OpenAI-compatible endpoint accepts that block including `strict` (verified
+against `gemini-flash-latest`), but it is documented as beta and drops or
+rejects fields it does not support, so a schema rejection is retried once in
+plain JSON mode with the schema restated in the prompt. Every response is
+validated against the feature's own schema regardless, so a provider that
+ignores the requested format produces a clean error rather than corrupt data.
+
+Failed provider calls are logged server-side with the provider's own reason:
+`ai.request.failed` (with `provider`, `model` and HTTP status), plus
+`ai.response.empty`, `ai.response.invalid_json`, `ai.request.unavailable`, and
+`ai.request.schema_rejected` as a warning when the retry recovers. The API key
+is stripped from the logged detail. This matters most for resume parsing, where
+an AI failure is deliberately non-fatal — the built-in parser answers instead,
+so without the log a dead key looks like ordinary output. The parse response
+names the parser that actually ran (`openai`, `gemini` or `fallback`).
 
 When demo mode is enabled:
 - the branding card remains editable and saveable

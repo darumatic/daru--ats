@@ -12,6 +12,15 @@ const { getIntegrationSettings } = vi.hoisted(() => ({
 
 vi.mock('@/lib/system-settings', () => ({ getIntegrationSettings }));
 
+const { logError, logWarn } = vi.hoisted(() => ({ logError: vi.fn(), logWarn: vi.fn() }));
+
+vi.mock('@/lib/logger', () => ({
+	logError,
+	logWarn,
+	logInfo: vi.fn(),
+	logDebug: vi.fn()
+}));
+
 const { requestAiChatCompletion, normalizeModelContent } = await import('@/lib/ai-chat-client');
 
 const SCHEMA = {
@@ -52,6 +61,8 @@ function lastCall(index = 0) {
 describe('requestAiChatCompletion', () => {
 	beforeEach(() => {
 		global.fetch = vi.fn();
+		logError.mockReset();
+		logWarn.mockReset();
 		getIntegrationSettings.mockResolvedValue(settings());
 	});
 
@@ -143,6 +154,7 @@ describe('requestAiChatCompletion', () => {
 		expect(global.fetch).toHaveBeenCalledTimes(1);
 		expect(result).toEqual({
 			ok: false,
+			provider: 'openai',
 			providerLabel: 'OpenAI',
 			error: 'OpenAI candidate summary request failed.'
 		});
@@ -177,6 +189,7 @@ describe('requestAiChatCompletion', () => {
 
 		expect(result).toEqual({
 			ok: false,
+			provider: 'openai',
 			providerLabel: 'OpenAI',
 			error: 'OpenAI returned an invalid candidate summary.'
 		});
@@ -221,6 +234,73 @@ describe('requestAiChatCompletion', () => {
 
 		expect(result.ok).toBe(false);
 		expect(result.error).toBe('OpenAI candidate summary is unavailable right now.');
+		expect(logError).toHaveBeenCalledWith(
+			'ai.request.unavailable',
+			expect.objectContaining({ provider: 'openai', detail: 'network down' })
+		);
+	});
+
+	it('returns the provider that answered, so callers can record provenance', async () => {
+		getIntegrationSettings.mockResolvedValue(settings({ aiProvider: 'gemini' }));
+		global.fetch.mockResolvedValue(jsonResponse('{"answer":"ok"}'));
+
+		const result = await requestAiChatCompletion({ feature: 'x', messages: MESSAGES, schema: SCHEMA });
+
+		expect(result.provider).toBe('gemini');
+		expect(result.providerLabel).toBe('Google Gemini');
+	});
+
+	// The resume parser degrades to the built-in parser on failure, so without
+	// this log a dead key or a wrong model looks exactly like ordinary output.
+	it('logs a failed request with the provider reason the caller never sees', async () => {
+		getIntegrationSettings.mockResolvedValue(settings({ aiProvider: 'gemini', aiModel: 'gemini-9-imaginary' }));
+		global.fetch.mockResolvedValue(
+			errorResponse(404, '{ "error": { "message": "models/gemini-9-imaginary is not found" } }')
+		);
+
+		const result = await requestAiChatCompletion({
+			feature: 'resume parsing',
+			messages: MESSAGES,
+			schema: SCHEMA
+		});
+
+		expect(result.ok).toBe(false);
+		expect(logError).toHaveBeenCalledTimes(1);
+		expect(logError).toHaveBeenCalledWith('ai.request.failed', {
+			feature: 'resume parsing',
+			provider: 'gemini',
+			model: 'gemini-9-imaginary',
+			status: 404,
+			detail: '{ "error": { "message": "models/gemini-9-imaginary is not found" } }'
+		});
+	});
+
+	it('keeps the API key out of the logged detail even when the provider echoes it', async () => {
+		getIntegrationSettings.mockResolvedValue(settings({ aiApiKey: 'AIza-secret-value' }));
+		global.fetch.mockResolvedValue(errorResponse(400, 'API key AIza-secret-value is invalid'));
+
+		await requestAiChatCompletion({ feature: 'x', messages: MESSAGES, schema: SCHEMA });
+
+		const { detail } = logError.mock.calls[0][1];
+		expect(detail).toBe('API key [REDACTED] is invalid');
+		expect(detail).not.toContain('AIza-secret-value');
+	});
+
+	it('logs the schema rejection it recovers from, rather than hiding the retry', async () => {
+		getIntegrationSettings.mockResolvedValue(settings({ aiProvider: 'gemini' }));
+		global.fetch
+			.mockResolvedValueOnce(errorResponse(400, 'Unknown name "strict"'))
+			.mockResolvedValueOnce(jsonResponse('{"answer":"recovered"}'));
+
+		const result = await requestAiChatCompletion({ feature: 'x', messages: MESSAGES, schema: SCHEMA });
+
+		expect(result.ok).toBe(true);
+		expect(logWarn).toHaveBeenCalledWith(
+			'ai.request.schema_rejected',
+			expect.objectContaining({ provider: 'gemini', status: 400, detail: 'Unknown name "strict"' })
+		);
+		// A recovered request is a warning, never an error.
+		expect(logError).not.toHaveBeenCalled();
 	});
 });
 

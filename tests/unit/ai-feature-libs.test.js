@@ -120,6 +120,32 @@ describe('job posting enhancer', () => {
 	});
 });
 
+describe('resume parser provenance', () => {
+	beforeEach(() => {
+		requestAiChatCompletion.mockReset();
+	});
+
+	it('reports which provider produced the draft', async () => {
+		requestAiChatCompletion.mockResolvedValue(
+			aiSuccess(
+				{
+					draft: { firstName: 'Dana', lastName: 'Reed' },
+					skills: [],
+					educationHistory: [],
+					workExperienceHistory: [],
+					warnings: []
+				},
+				{ provider: 'gemini' }
+			)
+		);
+
+		const result = await parseResumeToDraftWithAi('a resume long enough to parse');
+
+		expect(result.ok).toBe(true);
+		expect(result.provider).toBe('gemini');
+	});
+});
+
 describe('resume parser', () => {
 	beforeEach(() => {
 		requestAiChatCompletion.mockReset();

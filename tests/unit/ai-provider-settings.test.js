@@ -103,6 +103,20 @@ describe('integration settings AI resolution', () => {
 		expect(settings.aiModel).toBe('gemini-2.5-flash');
 	});
 
+	// OPENAI_RESUME_MODEL names an OpenAI model, so on Gemini it would be sent
+	// to Google verbatim and fail every call - and the admin field's hint
+	// promises the provider default when it is left blank.
+	it('ignores OPENAI_RESUME_MODEL on a provider it cannot name', async () => {
+		process.env.OPENAI_RESUME_MODEL = 'gpt-4o-mini';
+
+		const settings = await settingsFor({ aiApiKey: 'AIza-key', aiProvider: 'gemini' });
+
+		expect(settings.aiModel).toBe('gemini-2.5-flash');
+		expect(serializeAdminSystemSettings({ aiApiKey: 'AIza-key', aiProvider: 'gemini' }).aiModel).toBe(
+			'gemini-2.5-flash'
+		);
+	});
+
 	it('reports AI as available to admins whenever a key is stored', () => {
 		expect(serializeAdminSystemSettings({ aiApiKey: 'AIza-key', aiProvider: 'gemini' })).toMatchObject({
 			aiAvailable: true,
