@@ -141,6 +141,10 @@ describe('PATCH /api/system-settings', () => {
 
 		expect(response.status).toBe(503);
 		expect(body.error).toMatch(/could not be read/i);
+		// The status code is not the invariant - not writing is. Without these, a
+		// route that wrote the blank form and THEN returned 503 would still pass.
+		expect(mocks.settingUpdate).not.toHaveBeenCalled();
+		expect(mocks.settingCreate).not.toHaveBeenCalled();
 	});
 
 	it('does not block a save when there is genuinely no settings row yet', async () => {
