@@ -7,11 +7,14 @@ regressions from that fix; they are adjacent weaknesses the review surfaced.
 - [ ] `/opt/hiregnome-ops/autodeploy.sh` should run `npx prisma migrate deploy`
 	  **unconditionally** and abort on a non-zero exit before the build/swap, rather
 	  than trying to detect whether a migration is pending. `migrate deploy` is
-	  idempotent, and the detection is what let a pending migration ship without
-	  applying. The script lives outside version control, so its logic is unreviewed.
-- [ ] Never hand-apply a migration without recording it in `_prisma_migrations`:
-	  every later `migrate deploy` fails on it, silently, until something depends on
-	  a newer migration. Check `npx prisma migrate status` on production.
+	  idempotent and a no-op when nothing is pending, so the detection buys nothing
+	  and is what let the 2026-09-09 migration ship without being applied. Running
+	  the same command by hand on the origin host applied it with no complaint, so
+	  the migration and the recorded history were both fine - only the detection
+	  was wrong. The script lives outside version control, so its logic is unreviewed.
+- [ ] If a backup should still gate on migrations being pending, take it from
+	  `prisma migrate status`'s **exit code** (non-zero when not up to date) rather
+	  than by matching its output text, which changes between Prisma versions.
 
 ## Read-then-write hazards elsewhere
 - [ ] `app/api/onboarding/setup/route.js` still decides whether to create the
