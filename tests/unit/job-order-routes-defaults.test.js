@@ -204,3 +204,87 @@ describe('PATCH /api/job-orders/[id] without assignment ids', () => {
 		expect(prismaMock.jobOrder.update.mock.calls[0][0].data).toMatchObject({ clientId: 11, contactId: 20, ownerId: 30, divisionId: 40 });
 	});
 });
+
+// Specialising a job order's scoring criteria has three states, and the
+// difference between two of them is easy to lose: a body that omits
+// matchCriteria must leave the stored specialisation alone, while a body that
+// sends null must clear it so the job inherits the template again. A Zod
+// default on the field would collapse those into one.
+describe('PATCH /api/job-orders/[id] scoring criteria', () => {
+	const SPECIALISED = {
+		version: 1,
+		templateHash: 'abc123',
+		criteria: [{ key: 'location', label: 'Location', evaluatorKey: 'location', weight: 100, options: {} }]
+	};
+
+	function patchBody(extra) {
+		return { ...MINIMAL_BODY, employmentType: 'Permanent', ...extra };
+	}
+
+	beforeEach(() => {
+		getActingUser.mockResolvedValue(admin);
+		prismaMock.jobOrder.findFirst.mockResolvedValue({
+			id: 5,
+			title: 'Legacy role',
+			zipCode: '2000',
+			status: 'open',
+			publishToCareerSite: false,
+			customFields: null,
+			applicationQuestions: [],
+			matchCriteria: null,
+			clientId: 10,
+			contactId: 20,
+			ownerId: 30,
+			divisionId: 40
+		});
+	});
+
+	it('stores a specialised criteria set', async () => {
+		await updateJobOrder(
+			jsonRequest('http://localhost/api/job-orders/5', 'PATCH', patchBody({ matchCriteria: SPECIALISED })),
+			{ params: Promise.resolve({ id: '5' }) }
+		);
+
+		const written = prismaMock.jobOrder.update.mock.calls[0][0].data;
+		expect(written.matchCriteria.criteria).toHaveLength(1);
+		expect(written.matchCriteria.criteria[0].key).toBe('location');
+	});
+
+	it('leaves a stored specialisation untouched when the field is absent', async () => {
+		await updateJobOrder(
+			jsonRequest('http://localhost/api/job-orders/5', 'PATCH', patchBody({})),
+			{ params: Promise.resolve({ id: '5' }) }
+		);
+
+		expect(prismaMock.jobOrder.update.mock.calls[0][0].data).not.toHaveProperty('matchCriteria');
+	});
+
+	it('clears the specialisation when the field is explicitly null', async () => {
+		await updateJobOrder(
+			jsonRequest('http://localhost/api/job-orders/5', 'PATCH', patchBody({ matchCriteria: null })),
+			{ params: Promise.resolve({ id: '5' }) }
+		);
+
+		expect(prismaMock.jobOrder.update.mock.calls[0][0].data.matchCriteria).toBeNull();
+	});
+
+	it('rejects a specialised set the scoring engine could not use', async () => {
+		const response = await updateJobOrder(
+			jsonRequest(
+				'http://localhost/api/job-orders/5',
+				'PATCH',
+				patchBody({
+					matchCriteria: {
+						version: 1,
+						templateHash: '',
+						criteria: [{ key: 'location', label: 'Location', evaluatorKey: 'vibes', weight: 20 }]
+					}
+				})
+			),
+			{ params: Promise.resolve({ id: '5' }) }
+		);
+
+		expect(response.status).toBe(400);
+		expect(prismaMock.jobOrder.update).not.toHaveBeenCalled();
+	});
+});

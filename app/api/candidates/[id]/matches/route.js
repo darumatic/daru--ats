@@ -6,63 +6,24 @@ import { CANDIDATE_MATCH_RATE_LIMIT_MAX_REQUESTS, CANDIDATE_MATCH_RATE_LIMIT_WIN
 import { consumeRequestThrottle } from '@/lib/request-throttle';
 
 import { withApiLogging } from '@/lib/api-logging';
-import {
-	buildCandidateText,
-	buildJobText,
-	buildReasons,
-	findJobSkillIds,
-	inferRequiredYears,
-	inferYearsFromWorkExperience,
-	locationScore,
-	overlapRatio,
-	toBooleanParam,
-	toMatchLimit,
-	toPercent,
-	tokenize
-} from '@/lib/match-scoring';
+import { buildJobText, findJobSkillIds, toBooleanParam, toMatchLimit } from '@/lib/match-scoring';
+import { resolveEffectiveCriteria, sortMatches } from '@/lib/match-criteria';
+import { scoreCandidateForJobOrder } from '@/lib/match-criteria-evaluators';
+import { getMatchCriteriaTemplate, loadScoreOverlaysForCandidate } from '@/lib/match-criteria-store';
 
-function scoreJobOrder(candidate, jobOrder, allSkills, requiredSkillIds) {
-	const candidateSkillIds = new Set(
-		(candidate.candidateSkills || []).map((item) => item?.skill?.id).filter(Boolean)
-	);
-	const requiredSkillsMatched = requiredSkillIds
-		.filter((skillId) => candidateSkillIds.has(skillId))
-		.map((skillId) => allSkills.find((skill) => skill.id === skillId)?.name)
-		.filter(Boolean);
-	const requiredSkillsMissing = requiredSkillIds
-		.filter((skillId) => !candidateSkillIds.has(skillId))
-		.map((skillId) => allSkills.find((skill) => skill.id === skillId)?.name)
-		.filter(Boolean);
-
-	const requiredSkillCoverage =
-		requiredSkillIds.length > 0 ? requiredSkillsMatched.length / requiredSkillIds.length : 0.6;
-
-	const jobTokens = tokenize(buildJobText(jobOrder));
-	const candidateTokens = tokenize(buildCandidateText(candidate));
-	const keywordOverlap = overlapRatio(jobTokens, candidateTokens);
-	const titleOverlap = overlapRatio(tokenize(jobOrder?.title), tokenize(candidate?.currentJobTitle));
-
-	const inferredYears = inferYearsFromWorkExperience(candidate.candidateWorkExperiences);
-	const requiredYears = inferRequiredYears(jobOrder);
-	const experienceFit =
-		requiredYears > 0 ? Math.max(0, Math.min(1, inferredYears / requiredYears)) : Math.min(1, inferredYears / 8 || 0.4);
-
-	const locationFit = locationScore(jobOrder, candidate);
-
-	const hasExplicitRequiredSkills = requiredSkillIds.length > 0;
-	const weightedScore = hasExplicitRequiredSkills
-		? requiredSkillCoverage * 0.45 + titleOverlap * 0.2 + keywordOverlap * 0.15 + experienceFit * 0.15 + locationFit * 0.05
-		: requiredSkillCoverage * 0.25 + titleOverlap * 0.2 + keywordOverlap * 0.3 + experienceFit * 0.2 + locationFit * 0.05;
-
-	const { reasons, risks } = buildReasons({
-		requiredSkillsMatched,
-		requiredSkillsMissing,
-		experienceYears: inferredYears,
-		requiredYears,
-		locationFit,
-		titleOverlap
+// Each job order resolves its own criteria, so a candidate's list can honestly
+// mix jobs scored against the template with jobs that specialised their own set.
+function buildMatchRow({ candidate, jobOrder, templateCriteria, skills, overlay }) {
+	const { criteria } = resolveEffectiveCriteria({ jobOrder, templateCriteria });
+	const requiredSkillIds = findJobSkillIds(buildJobText(jobOrder), skills);
+	const scored = scoreCandidateForJobOrder({
+		candidate,
+		jobOrder,
+		criteria,
+		skills,
+		requiredSkillIds,
+		overlay
 	});
-
 	const openings = Number(jobOrder?.openings || 0);
 
 	return {
@@ -76,14 +37,17 @@ function scoreJobOrder(candidate, jobOrder, allSkills, requiredSkillIds) {
 			? `${jobOrder.ownerUser.firstName} ${jobOrder.ownerUser.lastName}`.trim()
 			: '-',
 		location: jobOrder.location || '',
-		score: Math.max(0, Math.min(1, weightedScore)),
-		scorePercent: toPercent(weightedScore),
 		openings: openings > 0 ? openings : null,
 		submissionCount: Number(jobOrder?._count?.submissions || 0),
 		activeHiring: true,
 		submittedToJobOrder: Array.isArray(jobOrder.submissions) && jobOrder.submissions.length > 0,
-		reasons,
-		risks
+		criteria: criteria.map((criterion) => ({
+			key: criterion.key,
+			label: criterion.label,
+			weight: criterion.weight,
+			evaluatorKey: criterion.evaluatorKey
+		})),
+		...scored
 	};
 }
 
@@ -135,10 +99,23 @@ async function getCandidates_id_matchesHandler(req, { params }) {
 				skillSet: true,
 				city: true,
 				state: true,
+				experienceYears: true,
+				addressLatitude: true,
+				addressLongitude: true,
 				divisionId: true,
 				candidateSkills: { include: { skill: { select: { id: true, name: true } } } },
 				candidateWorkExperiences: {
-					select: { title: true, startDate: true, endDate: true, isCurrent: true }
+					select: {
+						title: true,
+						companyName: true,
+						location: true,
+						startDate: true,
+						endDate: true,
+						isCurrent: true
+					}
+				},
+				candidateEducations: {
+					select: { schoolName: true, degree: true, fieldOfStudy: true }
 				}
 			}
 		});
@@ -183,14 +160,22 @@ async function getCandidates_id_matchesHandler(req, { params }) {
 			})
 		]);
 
-		const scored = jobOrders.map((jobOrder) => {
-			const requiredSkillIds = findJobSkillIds(buildJobText(jobOrder), skills);
-			return scoreJobOrder(candidate, jobOrder, skills, requiredSkillIds);
+		const templateCriteria = await getMatchCriteriaTemplate();
+		const overlays = await loadScoreOverlaysForCandidate({
+			candidateId: id,
+			jobOrderIds: jobOrders.map((jobOrder) => jobOrder.id)
 		});
+		const scored = jobOrders.map((jobOrder) =>
+			buildMatchRow({
+				candidate,
+				jobOrder,
+				templateCriteria,
+				skills,
+				overlay: overlays.get(jobOrder.id) || null
+			})
+		);
 
-		const sorted = scored
-			.sort((a, b) => b.score - a.score)
-			.slice(0, limit);
+		const sorted = sortMatches(scored).slice(0, limit);
 
 		return NextResponse.json({
 			candidateId: id,

@@ -298,11 +298,19 @@ async function patchJob_orders_idHandler(req, { params }) {
 			};
 		}
 
+		// normalizeJobOrderData does not carry matchCriteria, so it is applied
+		// here on its own terms: absent leaves the stored value alone, and an
+		// explicit null drops the specialisation so the job inherits the
+		// template again.
+		const matchCriteriaData =
+			parsed.data.matchCriteria === undefined ? {} : { matchCriteria: parsed.data.matchCriteria };
+
 		const jobOrder = await prisma.jobOrder.update({
 			where: { id },
 			data: {
 				...normalized,
-				...assignmentData
+				...assignmentData,
+				...matchCriteriaData
 			},
 			include: {
 				client: true,

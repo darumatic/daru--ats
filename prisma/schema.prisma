@@ -47,6 +47,7 @@ model SystemSetting {
 	aiApiKey          String?  @db.Text @map("openAiApiKey")
 	aiProvider        String?
 	aiModel           String?
+	aiReasoningModel  String?
 	smtpHost          String?
 	smtpPort          Int?
 	smtpSecure        Boolean  @default(false)
@@ -107,6 +108,7 @@ model User {
 	uploadedCandidateAttachments CandidateAttachment[] @relation("CandidateAttachmentUploadedBy")
 	generatedCandidateSummaries CandidateAiSummary[]
 	generatedMatchExplanations MatchExplanation[]
+	generatedCandidateJobScores CandidateJobScore[]
 	createdClientPortalAccesses ClientPortalAccess[] @relation("ClientPortalAccessCreatedBy")
 	candidateStatusChanges CandidateStatusChange[] @relation("CandidateStatusChangedBy")
 	auditLogs       AuditLog[]  @relation("AuditLogActor")
@@ -304,6 +306,7 @@ model Candidate {
 	statusChanges   CandidateStatusChange[]
 	aiSummary       CandidateAiSummary?
 	matchExplanations MatchExplanation[]
+	candidateJobScores CandidateJobScore[]
 
 	@@index([firstName, lastName])
 	@@index([mobile])
@@ -362,6 +365,28 @@ model CustomFieldDefinition {
 
 	@@unique([moduleKey, fieldKey])
 	@@index([moduleKey, isActive, sortOrder])
+}
+
+// The weighted criteria a candidate is scored against. Global and
+// admin-editable; a job order inherits this set unless it has specialised its
+// own copy into JobOrder.matchCriteria. Removal is a soft delete, so a
+// deliberate removal is never resurrected by the default-seeding path.
+model MatchCriterion {
+	id           Int      @id @default(autoincrement())
+	recordId     String   @unique
+	key          String   @unique
+	label        String
+	description  String?  @db.Text
+	evaluatorKey String
+	weight       Int      @default(20)
+	options      Json?
+	aiEnabled    Boolean  @default(true)
+	isActive     Boolean  @default(true)
+	sortOrder    Int      @default(0)
+	createdAt    DateTime @default(now())
+	updatedAt    DateTime @updatedAt
+
+	@@index([isActive, sortOrder])
 }
 
 model CandidateSkill {
@@ -644,6 +669,7 @@ model JobOrder {
 	closedAt              DateTime?
 	customFields          Json?
 	applicationQuestions  Json         @default("[]")
+	matchCriteria         Json?
 	ownerId               Int?
 	divisionId            Int?
 	createdAt             DateTime     @default(now())
@@ -661,6 +687,7 @@ model JobOrder {
 	interviews  Interview[]
 	offers      Offer[]
 	matchExplanations MatchExplanation[]
+	candidateJobScores CandidateJobScore[]
 	clientPortalAccesses ClientPortalAccess[]
 
 	@@index([title])
@@ -775,6 +802,37 @@ model MatchExplanation {
 	@@index([generatedByUserId])
 	@@index([candidateId])
 	@@index([jobOrderId])
+}
+
+// Cached AI criterion scores for one candidate/job pair. criteriaResults holds
+// a per-criterion judgement stamped with that criterion's own hash, so
+// re-weighting a criterion reuses everything while redefining one invalidates
+// only that one. scorePercent is a denormalised snapshot for sorting; the match
+// routes always recompute the total from the criteria in force now.
+model CandidateJobScore {
+	id                 Int      @id @default(autoincrement())
+	recordId           String   @unique
+	scorePercent       Int?
+	coveragePercent    Int?
+	criteriaResults    Json
+	criteriaSetHash    String
+	candidateUpdatedAt DateTime?
+	jobOrderUpdatedAt  DateTime?
+	modelName          String?
+	createdAt          DateTime @default(now())
+	updatedAt          DateTime @updatedAt
+	candidateId        Int
+	jobOrderId         Int
+	generatedByUserId  Int?
+
+	candidate       Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+	jobOrder        JobOrder  @relation(fields: [jobOrderId], references: [id], onDelete: Cascade)
+	generatedByUser User?     @relation(fields: [generatedByUserId], references: [id], onDelete: SetNull)
+
+	@@unique([candidateId, jobOrderId])
+	@@index([jobOrderId, scorePercent])
+	@@index([candidateId])
+	@@index([generatedByUserId])
 }
 
 model ClientPortalAccess {

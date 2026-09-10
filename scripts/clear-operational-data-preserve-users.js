@@ -14,6 +14,7 @@ const DELETE_PLAN = [
 	['offer', 'Placements'],
 	['interview', 'Interviews'],
 	['matchExplanation', 'Match explanations'],
+	['candidateJobScore', 'Candidate match scores'],
 	['submission', 'Submissions'],
 	['candidateStatusChange', 'Candidate status changes'],
 	['candidateNote', 'Candidate notes'],

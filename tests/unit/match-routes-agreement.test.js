@@ -11,6 +11,8 @@ const { prismaMock } = vi.hoisted(() => ({
 	prismaMock: {
 		jobOrder: { findFirst: vi.fn(), findMany: vi.fn() },
 		candidate: { findFirst: vi.fn(), findMany: vi.fn() },
+		candidateJobScore: { findMany: vi.fn() },
+		matchCriterion: { findMany: vi.fn(), count: vi.fn() },
 		skill: { findMany: vi.fn() }
 	}
 }));
@@ -24,9 +26,24 @@ vi.mock('@/lib/request-throttle', () => ({
 	consumeRequestThrottle: vi.fn().mockResolvedValue({ allowed: true })
 }));
 vi.mock('@/lib/api-logging', () => ({ withApiLogging: (_route, handler) => handler }));
+// The template is mocked rather than read through Prisma: the store keeps a 30s
+// process-wide cache, which would otherwise leak one test's template into the
+// next. Overlays stay real so the merge path is exercised.
+vi.mock('@/lib/match-criteria-store', async (importOriginal) => ({
+	...(await importOriginal()),
+	getMatchCriteriaTemplate: vi.fn(),
+	loadScoreOverlays: vi.fn(),
+	loadScoreOverlaysForCandidate: vi.fn()
+}));
 
 import { getActingUser } from '@/lib/access-control';
 import { consumeRequestThrottle } from '@/lib/request-throttle';
+import {
+	getMatchCriteriaTemplate,
+	loadScoreOverlays,
+	loadScoreOverlaysForCandidate
+} from '@/lib/match-criteria-store';
+import { DEFAULT_MATCH_CRITERIA, buildCriterionHash } from '@/lib/match-criteria';
 import { GET as jobOrderMatches } from '../../app/api/job-orders/[id]/matches/route.js';
 import { GET as candidateMatches } from '../../app/api/candidates/[id]/matches/route.js';
 
@@ -115,6 +132,12 @@ beforeEach(() => {
 	getActingUser.mockResolvedValue(admin);
 	consumeRequestThrottle.mockClear();
 	consumeRequestThrottle.mockResolvedValue({ allowed: true });
+	getMatchCriteriaTemplate.mockReset();
+	getMatchCriteriaTemplate.mockResolvedValue(DEFAULT_MATCH_CRITERIA);
+	loadScoreOverlays.mockReset();
+	loadScoreOverlays.mockResolvedValue(new Map());
+	loadScoreOverlaysForCandidate.mockReset();
+	loadScoreOverlaysForCandidate.mockResolvedValue(new Map());
 });
 
 describe('candidate/job-order match scoring, from both directions', () => {
@@ -212,5 +235,199 @@ describe('job-order match eligibility', () => {
 		expect(response.status).toBe(429);
 		expect(response.headers.get('Retry-After')).toBe('30');
 		expect(prismaMock.jobOrder.findFirst).not.toHaveBeenCalled();
+	});
+});
+
+describe('criteria-driven job-order matches', () => {
+	it('reports the criteria it scored against, so the number can be read', async () => {
+		prismaMock.jobOrder.findFirst.mockResolvedValue(buildJobOrder(201));
+		prismaMock.skill.findMany.mockResolvedValue(SKILLS);
+		prismaMock.candidate.findMany.mockResolvedValue([buildCandidate(60)]);
+
+		const response = await jobOrderMatches(
+			new Request('http://localhost/api/job-orders/201/matches'),
+			{ params: Promise.resolve({ id: '201' }) }
+		);
+		const payload = await response.json();
+
+		expect(payload.criteriaSource).toBe('template');
+		expect(payload.criteria.map((criterion) => criterion.key)).toEqual(
+			DEFAULT_MATCH_CRITERIA.map((criterion) => criterion.key)
+		);
+		expect(payload.matches[0].criteriaResults).toHaveLength(DEFAULT_MATCH_CRITERIA.length);
+		expect(payload.matches[0].coveragePercent).toBeLessThan(100);
+	});
+
+	it('leaves an unconfigured criterion out of the score instead of scoring it zero', async () => {
+		prismaMock.jobOrder.findFirst.mockResolvedValue(buildJobOrder(202));
+		prismaMock.skill.findMany.mockResolvedValue(SKILLS);
+		prismaMock.candidate.findMany.mockResolvedValue([buildCandidate(61)]);
+
+		const response = await jobOrderMatches(
+			new Request('http://localhost/api/job-orders/202/matches'),
+			{ params: Promise.resolve({ id: '202' }) }
+		);
+		const [match] = (await response.json()).matches;
+		const bigCompany = match.criteriaResults.find((row) => row.key === 'big_company');
+
+		// Seeded with an empty employer list, so the rules engine cannot judge it.
+		expect(bigCompany).toMatchObject({ assessed: false, score: null, source: 'none' });
+		// Three of the five criteria cannot be judged here: big_company (15) and
+		// university (10) ship with empty reference lists, and local_experience
+		// (15) has no located work history to read. Only jd_criteria_match (40)
+		// and location (20) count, so coverage is 60% - and the score is the
+		// average of those two alone rather than being dragged down by three
+		// invented zeroes.
+		expect(match.coveragePercent).toBe(60);
+		expect(match.hasAiScore).toBe(false);
+	});
+
+	it('lets a fresh AI judgement supersede the rule score and raise coverage', async () => {
+		const criterion = DEFAULT_MATCH_CRITERIA.find((row) => row.key === 'big_company');
+		loadScoreOverlays.mockResolvedValue(
+			new Map([
+				[
+					62,
+					{
+						candidateId: 62,
+						criteriaResults: [
+							{
+								key: 'big_company',
+								criterionHash: buildCriterionHash(criterion),
+								score: 90,
+								assessed: true,
+								rationale: 'Globex is a household name in this market.'
+							}
+						]
+					}
+				]
+			])
+		);
+		prismaMock.jobOrder.findFirst.mockResolvedValue(buildJobOrder(203));
+		prismaMock.skill.findMany.mockResolvedValue(SKILLS);
+		prismaMock.candidate.findMany.mockResolvedValue([buildCandidate(62)]);
+
+		const response = await jobOrderMatches(
+			new Request('http://localhost/api/job-orders/203/matches'),
+			{ params: Promise.resolve({ id: '203' }) }
+		);
+		const [match] = (await response.json()).matches;
+		const bigCompany = match.criteriaResults.find((row) => row.key === 'big_company');
+
+		expect(bigCompany).toMatchObject({ assessed: true, score: 90, source: 'ai' });
+		expect(bigCompany.basis).toContain('household name');
+		expect(match.hasAiScore).toBe(true);
+		// 60% plus the 15 that big_company carries once AI has judged it.
+		expect(match.coveragePercent).toBe(75);
+	});
+
+	it('ignores a cached judgement once the criterion it judged has been redefined', async () => {
+		loadScoreOverlays.mockResolvedValue(
+			new Map([
+				[
+					63,
+					{
+						candidateId: 63,
+						criteriaResults: [
+							{ key: 'big_company', criterionHash: 'stale000', score: 90, assessed: true, rationale: 'old' }
+						]
+					}
+				]
+			])
+		);
+		prismaMock.jobOrder.findFirst.mockResolvedValue(buildJobOrder(204));
+		prismaMock.skill.findMany.mockResolvedValue(SKILLS);
+		prismaMock.candidate.findMany.mockResolvedValue([buildCandidate(63)]);
+
+		const response = await jobOrderMatches(
+			new Request('http://localhost/api/job-orders/204/matches'),
+			{ params: Promise.resolve({ id: '204' }) }
+		);
+		const [match] = (await response.json()).matches;
+
+		expect(match.criteriaResults.find((row) => row.key === 'big_company').assessed).toBe(false);
+		expect(match.hasAiScore).toBe(false);
+	});
+
+	it('scores a specialised job order against its own criteria, not the template', async () => {
+		prismaMock.jobOrder.findFirst.mockResolvedValue({
+			...buildJobOrder(205),
+			matchCriteria: {
+				version: 1,
+				templateHash: 'whatever',
+				criteria: [
+					{ key: 'location', label: 'Location', evaluatorKey: 'location', weight: 100, options: {} }
+				]
+			}
+		});
+		prismaMock.skill.findMany.mockResolvedValue(SKILLS);
+		prismaMock.candidate.findMany.mockResolvedValue([buildCandidate(64)]);
+
+		const response = await jobOrderMatches(
+			new Request('http://localhost/api/job-orders/205/matches'),
+			{ params: Promise.resolve({ id: '205' }) }
+		);
+		const payload = await response.json();
+
+		expect(payload.criteriaSource).toBe('job');
+		expect(payload.criteria.map((criterion) => criterion.key)).toEqual(['location']);
+		// Sydney candidate, Sydney job, scored on location alone.
+		expect(payload.matches[0].scorePercent).toBe(100);
+		expect(payload.matches[0].coveragePercent).toBe(100);
+	});
+
+	it('flags a specialised job order whose template has since moved on', async () => {
+		prismaMock.jobOrder.findFirst.mockResolvedValue({
+			...buildJobOrder(206),
+			matchCriteria: {
+				version: 1,
+				templateHash: 'from-an-older-template',
+				criteria: [{ key: 'location', label: 'Location', evaluatorKey: 'location', weight: 100, options: {} }]
+			}
+		});
+		prismaMock.skill.findMany.mockResolvedValue(SKILLS);
+		prismaMock.candidate.findMany.mockResolvedValue([buildCandidate(65)]);
+
+		const response = await jobOrderMatches(
+			new Request('http://localhost/api/job-orders/206/matches'),
+			{ params: Promise.resolve({ id: '206' }) }
+		);
+
+		expect((await response.json()).templateDrifted).toBe(true);
+	});
+
+	it('bounds the candidate scan instead of reading the whole division', async () => {
+		prismaMock.jobOrder.findFirst.mockResolvedValue(buildJobOrder(207));
+		prismaMock.skill.findMany.mockResolvedValue(SKILLS);
+		prismaMock.candidate.findMany.mockResolvedValue([buildCandidate(66)]);
+
+		await jobOrderMatches(new Request('http://localhost/api/job-orders/207/matches'), {
+			params: Promise.resolve({ id: '207' })
+		});
+
+		expect(prismaMock.candidate.findMany.mock.calls[0][0].take).toBe(500);
+	});
+
+	it('does not serve a cached list after the criteria have changed', async () => {
+		prismaMock.jobOrder.findFirst.mockResolvedValue(buildJobOrder(208));
+		prismaMock.skill.findMany.mockResolvedValue(SKILLS);
+		prismaMock.candidate.findMany.mockResolvedValue([buildCandidate(67)]);
+
+		const first = await jobOrderMatches(new Request('http://localhost/api/job-orders/208/matches'), {
+			params: Promise.resolve({ id: '208' })
+		});
+		const firstScore = (await first.json()).matches[0].scorePercent;
+
+		// Re-weight the template so location alone decides the score.
+		getMatchCriteriaTemplate.mockResolvedValue([
+			{ key: 'location', label: 'Location', evaluatorKey: 'location', weight: 100, options: {} }
+		]);
+		const second = await jobOrderMatches(new Request('http://localhost/api/job-orders/208/matches'), {
+			params: Promise.resolve({ id: '208' })
+		});
+		const secondPayload = await second.json();
+
+		expect(secondPayload.criteria.map((criterion) => criterion.key)).toEqual(['location']);
+		expect(secondPayload.matches[0].scorePercent).not.toBe(firstScore);
 	});
 });

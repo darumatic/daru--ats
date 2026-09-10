@@ -5,20 +5,11 @@ import { parseRouteId, ValidationError } from '@/lib/request-validation';
 import { JOB_ORDER_MATCH_RATE_LIMIT_MAX_REQUESTS, JOB_ORDER_MATCH_RATE_LIMIT_WINDOW_SECONDS } from '@/lib/security-constants';
 import { consumeRequestThrottle } from '@/lib/request-throttle';
 import { formatPersonName } from '@/lib/person-name';
-import {
-	buildCandidateText,
-	buildJobText,
-	buildReasons,
-	findJobSkillIds,
-	inferRequiredYears,
-	inferYearsFromWorkExperience,
-	locationScore,
-	overlapRatio,
-	toBooleanParam,
-	toMatchLimit,
-	toPercent,
-	tokenize
-} from '@/lib/match-scoring';
+import { buildJobText, findJobSkillIds, toBooleanParam, toMatchLimit } from '@/lib/match-scoring';
+import { buildCriteriaSetHash, resolveEffectiveCriteria, sortMatches } from '@/lib/match-criteria';
+import { scoreCandidateForJobOrder } from '@/lib/match-criteria-evaluators';
+import { getMatchCriteriaTemplate, loadScoreOverlays } from '@/lib/match-criteria-store';
+import { MATCH_LIST_MAX_CANDIDATE_POOL } from '@/lib/security-constants';
 
 import { withApiLogging } from '@/lib/api-logging';
 
@@ -26,8 +17,11 @@ const MATCH_CACHE_TTL_MS = 60_000;
 const MATCH_CACHE_MAX_ENTRIES = 64;
 const matchCache = new Map();
 
-function buildMatchCacheKey({ jobOrderId, includeSubmitted, limit, scope }) {
-	return `job-order-match|${jobOrderId}|${includeSubmitted ? 1 : 0}|${limit}|${JSON.stringify(scope || {})}`;
+// The criteria hash is part of the key on purpose: without it, editing a weight
+// leaves every match list serving the old numbers until the TTL expires, which
+// reads as the edit not having worked.
+function buildMatchCacheKey({ jobOrderId, includeSubmitted, limit, scope, criteriaHash }) {
+	return `job-order-match|${jobOrderId}|${includeSubmitted ? 1 : 0}|${limit}|${criteriaHash}|${JSON.stringify(scope || {})}`;
 }
 
 function getCachedMatchResponse(key) {
@@ -59,46 +53,14 @@ function isMissingJobMatchFieldError(error, fieldName) {
 }
 
 
-function scoreCandidate(candidate, jobOrder, allSkills, requiredSkillIds) {
-	const candidateSkillIds = new Set(
-		(candidate.candidateSkills || []).map((item) => item?.skill?.id).filter(Boolean)
-	);
-	const requiredSkillsMatched = requiredSkillIds
-		.filter((skillId) => candidateSkillIds.has(skillId))
-		.map((skillId) => allSkills.find((skill) => skill.id === skillId)?.name)
-		.filter(Boolean);
-	const requiredSkillsMissing = requiredSkillIds
-		.filter((skillId) => !candidateSkillIds.has(skillId))
-		.map((skillId) => allSkills.find((skill) => skill.id === skillId)?.name)
-		.filter(Boolean);
-
-	const requiredSkillCoverage =
-		requiredSkillIds.length > 0 ? requiredSkillsMatched.length / requiredSkillIds.length : 0.6;
-
-	const jobTokens = tokenize(buildJobText(jobOrder));
-	const candidateTokens = tokenize(buildCandidateText(candidate));
-	const keywordOverlap = overlapRatio(jobTokens, candidateTokens);
-	const titleOverlap = overlapRatio(tokenize(jobOrder?.title), tokenize(candidate?.currentJobTitle));
-
-	const inferredYears = inferYearsFromWorkExperience(candidate.candidateWorkExperiences);
-	const requiredYears = inferRequiredYears(jobOrder);
-	const experienceFit =
-		requiredYears > 0 ? Math.max(0, Math.min(1, inferredYears / requiredYears)) : Math.min(1, inferredYears / 8 || 0.4);
-
-	const locationFit = locationScore(jobOrder, candidate);
-
-	const hasExplicitRequiredSkills = requiredSkillIds.length > 0;
-	const weightedScore = hasExplicitRequiredSkills
-		? requiredSkillCoverage * 0.45 + titleOverlap * 0.2 + keywordOverlap * 0.15 + experienceFit * 0.15 + locationFit * 0.05
-		: requiredSkillCoverage * 0.25 + titleOverlap * 0.2 + keywordOverlap * 0.3 + experienceFit * 0.2 + locationFit * 0.05;
-
-	const { reasons, risks } = buildReasons({
-		requiredSkillsMatched,
-		requiredSkillsMissing,
-		experienceYears: inferredYears,
-		requiredYears,
-		locationFit,
-		titleOverlap
+function buildMatchRow({ candidate, jobOrder, criteria, skills, requiredSkillIds, overlay }) {
+	const scored = scoreCandidateForJobOrder({
+		candidate,
+		jobOrder,
+		criteria,
+		skills,
+		requiredSkillIds,
+		overlay
 	});
 
 	return {
@@ -109,18 +71,8 @@ function scoreCandidate(candidate, jobOrder, allSkills, requiredSkillIds) {
 		}),
 		currentJobTitle: candidate.currentJobTitle || '',
 		ownerName: candidate.ownerUser ? `${candidate.ownerUser.firstName} ${candidate.ownerUser.lastName}` : '-',
-		score: Math.max(0, Math.min(1, weightedScore)),
-		scorePercent: toPercent(weightedScore),
 		submittedToJobOrder: Array.isArray(candidate.submissions) && candidate.submissions.length > 0,
-		reasons,
-		risks,
-		componentScores: {
-			requiredSkillCoverage: toPercent(requiredSkillCoverage),
-			titleOverlap: toPercent(titleOverlap),
-			keywordOverlap: toPercent(keywordOverlap),
-			experienceFit: toPercent(experienceFit),
-			locationFit: toPercent(locationFit)
-		}
+		...scored
 	};
 }
 
@@ -161,16 +113,6 @@ async function getJob_orders_id_matchesHandler(req, { params }) {
 		const { searchParams } = new URL(req.url);
 		const includeSubmitted = toBooleanParam(searchParams.get('includeSubmitted'), false);
 		const limit = toMatchLimit(searchParams.get('limit'), 10);
-		const cacheKey = buildMatchCacheKey({
-			jobOrderId: id,
-			includeSubmitted,
-			limit,
-			scope
-		});
-		const cached = getCachedMatchResponse(cacheKey);
-		if (cached) {
-			return NextResponse.json(cached);
-		}
 
 		let jobOrder;
 		let includeDivisionFilter = true;
@@ -185,8 +127,13 @@ async function getJob_orders_id_matchesHandler(req, { params }) {
 					description: true,
 					publicDescription: true,
 					location: true,
+					locationLatitude: true,
+					locationLongitude: true,
+					city: true,
+					state: true,
 					employmentType: true,
 					divisionId: true,
+					matchCriteria: true,
 					_count: {
 						select: {
 							submissions: true
@@ -223,6 +170,18 @@ async function getJob_orders_id_matchesHandler(req, { params }) {
 
 		if (!jobOrder) {
 			return NextResponse.json({ error: 'Job order not found.' }, { status: 404 });
+		}
+
+		const templateCriteria = await getMatchCriteriaTemplate();
+		const { criteria, source: criteriaSource, templateDrifted } = resolveEffectiveCriteria({
+			jobOrder,
+			templateCriteria
+		});
+		const criteriaHash = buildCriteriaSetHash(criteria);
+		const cacheKey = buildMatchCacheKey({ jobOrderId: id, includeSubmitted, limit, scope, criteriaHash });
+		const cached = getCachedMatchResponse(cacheKey);
+		if (cached) {
+			return NextResponse.json(cached);
 		}
 
 		if (jobOrder.status !== 'open') {
@@ -265,22 +224,49 @@ async function getJob_orders_id_matchesHandler(req, { params }) {
 					ownerUser: { select: { id: true, firstName: true, lastName: true } },
 					candidateSkills: { include: { skill: { select: { id: true, name: true } } } },
 					candidateWorkExperiences: {
-						select: { title: true, startDate: true, endDate: true, isCurrent: true }
+						select: {
+							title: true,
+							companyName: true,
+							location: true,
+							startDate: true,
+							endDate: true,
+							isCurrent: true
+						}
+					},
+					candidateEducations: {
+						select: { schoolName: true, degree: true, fieldOfStudy: true }
 					},
 					submissions: {
 						where: { jobOrderId: id },
 						select: { id: true, status: true }
 					}
 				},
-				orderBy: { updatedAt: 'desc' }
+				orderBy: { updatedAt: 'desc' },
+				// Previously unbounded: every request scored the entire in-scope
+				// pool. The criteria engine does strictly more work per candidate,
+				// so the scan is capped. A division larger than the cap sees the
+				// most recently updated candidates, which is the order the query
+				// already used.
+				take: MATCH_LIST_MAX_CANDIDATE_POOL
 			})
 		]);
 
 		const requiredSkillIds = findJobSkillIds(buildJobText(jobOrder), skills);
-		const scored = candidates.map((candidate) => scoreCandidate(candidate, jobOrder, skills, requiredSkillIds));
-		const sorted = scored
-			.sort((a, b) => b.score - a.score)
-			.slice(0, limit);
+		const overlays = await loadScoreOverlays({
+			jobOrderId: id,
+			candidateIds: candidates.map((candidate) => candidate.id)
+		});
+		const scored = candidates.map((candidate) =>
+			buildMatchRow({
+				candidate,
+				jobOrder,
+				criteria,
+				skills,
+				requiredSkillIds,
+				overlay: overlays.get(candidate.id) || null
+			})
+		);
+		const sorted = sortMatches(scored).slice(0, limit);
 
 		const payload = {
 			jobOrderId: id,
@@ -289,6 +275,17 @@ async function getJob_orders_id_matchesHandler(req, { params }) {
 				.map((skillId) => skills.find((skill) => skill.id === skillId)?.name)
 				.filter(Boolean),
 			totalCandidatesEvaluated: scored.length,
+			// The criteria in force, so the list can show the weighting it scored
+			// against and flag a job whose specialised set has fallen behind the
+			// template.
+			criteria: criteria.map((criterion) => ({
+				key: criterion.key,
+				label: criterion.label,
+				weight: criterion.weight,
+				evaluatorKey: criterion.evaluatorKey
+			})),
+			criteriaSource,
+			templateDrifted,
 			matches: sorted
 		};
 		setCachedMatchResponse(cacheKey, payload);
