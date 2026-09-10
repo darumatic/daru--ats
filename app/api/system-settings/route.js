@@ -13,7 +13,8 @@ import {
 	serializeAdminSystemSettings,
 	serializeSystemBranding,
 	DEFAULT_SITE_NAME,
-	DEFAULT_API_ERROR_LOG_RETENTION_DAYS
+	DEFAULT_API_ERROR_LOG_RETENTION_DAYS,
+	readSystemSettingRecord
 } from '@/lib/system-settings';
 import { DEFAULT_THEME_KEY, normalizeThemeKey } from '@/lib/theme-options';
 import { normalizeAiProvider } from '@/lib/ai-providers';
@@ -362,7 +363,22 @@ async function patchSystem_settingsHandler(req) {
 		return NextResponse.json({ error: 'Only administrators can update system settings.' }, { status: 403 });
 	}
 
-	const existing = await getSystemSettingRecord();
+	// A write must never be based on a failed read. `existing` feeds every
+	// "keep the stored value" fallback below, and the settings form posts all of
+	// its fields on save - so saving while the row is unreadable would write the
+	// blank form over real credentials and branding, permanently.
+	const existingRead = await readSystemSettingRecord();
+	if (!existingRead.ok) {
+		return NextResponse.json(
+			{
+				error:
+					'System settings could not be read, so saving is blocked to avoid overwriting stored values. Check /api/health and the server logs.'
+			},
+			{ status: 503 }
+		);
+	}
+
+	const existing = existingRead.setting;
 	const input = await parseBody(req);
 	if (DEMO_MODE) {
 		const allowedDemoSettingKeys = new Set([

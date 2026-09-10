@@ -3,7 +3,7 @@ import path from 'node:path';
 import { NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/prisma';
-import { getIntegrationSettings } from '@/lib/system-settings';
+import { getIntegrationSettings, readSystemSettingRecord } from '@/lib/system-settings';
 import { getOnboardingState } from '@/lib/onboarding';
 import { getObjectStorageConfig } from '@/lib/object-storage';
 
@@ -55,9 +55,13 @@ async function buildIntegrationHealth() {
 	try {
 		const integrationSettings = await getIntegrationSettings();
 		const objectStorage = await getObjectStorageConfig();
-		const objectStorageConfigured = objectStorage.mode === 'local'
-			? true
-			: buildPresenceFlag(objectStorage.bucket);
+		// An unreadable configuration is not a working "local mode" deployment:
+		// uploads are refused in that state, so it must not report as configured.
+		const objectStorageConfigured = integrationSettings.settingsReadFailed
+			? false
+			: objectStorage.mode === 'local'
+				? true
+				: buildPresenceFlag(objectStorage.bucket);
 		return {
 			ai: buildPresenceFlag(integrationSettings.aiApiKey),
 			googleMaps: buildPresenceFlag(integrationSettings.googleMapsApiKey),
@@ -84,18 +88,34 @@ async function buildIntegrationHealth() {
 }
 
 async function getHealthStatus() {
-	const [db, onboardingState, envVars, integration] = await Promise.all([
+	// The settings read is probed FRESH on every health check rather than read
+	// off the recorded failure state. That state is process-global and sticky
+	// until something happens to re-read successfully, so trusting it here would
+	// let one transient error hold the endpoint at 503 - and this endpoint is
+	// what the deploy gates its rollback on, so a stale 503 would roll back a
+	// perfectly good deploy. A live probe reports what is true right now.
+	const [db, onboardingState, envVars, integration, settingsRead] = await Promise.all([
 		hasDatabaseConnection(),
 		getOnboardingState(),
 		readEnvFileValues(),
-		buildIntegrationHealth()
+		buildIntegrationHealth(),
+		readSystemSettingRecord()
 	]);
+
+	// A database answering SELECT 1 is not enough to call the app healthy: it can
+	// be up while the settings row is unreadable (schema drift, a pending
+	// migration), which silently reverts branding and takes the careers site
+	// offline. That has to report unhealthy or a broken deploy stays live.
+	const systemSettings = settingsRead.ok
+		? { ok: true }
+		: { ok: false, error: settingsRead.error?.message || 'system_settings_read_failed' };
 
 	return {
 		timestamp: new Date().toISOString(),
 		version: process.env.npm_package_version || '0.1.0',
 		service: 'Hire Gnome ATS',
-		ok: db.ok && onboardingState !== null,
+		ok: db.ok && onboardingState !== null && systemSettings.ok,
+		systemSettings,
 		database: {
 			...db
 		},
@@ -116,7 +136,7 @@ async function getHealthStatus() {
 
 export async function GET() {
 	const health = await getHealthStatus();
-	const statusCode = health.database.ok ? 200 : 503;
+	const statusCode = health.database.ok && health.systemSettings.ok ? 200 : 503;
 	return NextResponse.json(health, {
 		status: statusCode,
 		headers: {

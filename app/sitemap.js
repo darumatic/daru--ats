@@ -2,6 +2,11 @@ import { listPublicCareerSitemapJobs } from '@/lib/careers-public';
 import { getPublicAppBaseUrl } from '@/lib/site-url';
 import { getSystemBranding } from '@/lib/system-settings';
 
+// Reads system settings at request time. Statically generated, this would be
+// baked from the build-time settings skip, which reads as "careers disabled" —
+// permanently telling crawlers to ignore the careers site.
+export const dynamic = 'force-dynamic';
+
 export default async function sitemap() {
 	const branding = await getSystemBranding();
 	if (!branding?.careerSiteEnabled) {

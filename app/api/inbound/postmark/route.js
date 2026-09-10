@@ -219,11 +219,32 @@ async function maybeSaveCandidateAttachment(candidateId, messageId, attachment, 
 		};
 	}
 
-	const uploaded = await uploadObjectBuffer({
-		key: storageKey,
-		body: buffer,
-		contentType: contentType || 'application/octet-stream'
-	});
+	// A storage failure must not abort the whole webhook. The InboundEmailEvent
+	// row written at the end is what makes this handler idempotent, so throwing
+	// past it would make Postmark retry and duplicate the notes it already
+	// created. Report the attachment as unsaved instead, like every other skip
+	// reason above.
+	let uploaded;
+	try {
+		uploaded = await uploadObjectBuffer({
+			key: storageKey,
+			body: buffer,
+			contentType: contentType || 'application/octet-stream'
+		});
+	} catch (error) {
+		return {
+			saved: false,
+			reason: 'storage_unavailable',
+			error: error?.message || 'upload_failed',
+			fileName,
+			candidateId,
+			contentType,
+			contentLength,
+			contentField,
+			availableKeys
+		};
+	}
+
 	const saved = await prisma.candidateAttachment.create({
 		data: {
 			recordId: createRecordId('CandidateAttachment'),

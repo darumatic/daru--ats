@@ -5,6 +5,7 @@ require('./load-env.cjs');
 
 const { spawnSync } = require('node:child_process');
 const { PrismaClient } = require('@prisma/client');
+const { isMissingTableError } = require('./prisma-error-utils.cjs');
 
 const RESET_MODE_VALUES = new Set(['full', 'seed']);
 const DEMO_SITE_NAME = 'Hire Gnome ATS';
@@ -48,12 +49,6 @@ function runCommand(command, args) {
 	}
 }
 
-function isMissingSystemSettingsTableError(error) {
-	if (!error) return false;
-	if (error.code === 'P2021') return true;
-	return String(error.message || '').includes('SystemSetting');
-}
-
 async function loadSystemSettingsSnapshot(enabled) {
 	if (!enabled) return null;
 	const prisma = new PrismaClient();
@@ -86,7 +81,7 @@ async function loadSystemSettingsSnapshot(enabled) {
 		});
 		return settings || null;
 	} catch (error) {
-		if (isMissingSystemSettingsTableError(error)) {
+		if (isMissingTableError(error)) {
 			console.log('[demo-reset] System settings table not found yet; skipping settings snapshot.');
 			return null;
 		}
@@ -116,7 +111,7 @@ async function restoreSystemSettings(snapshot) {
 		}
 		return true;
 	} catch (error) {
-		if (isMissingSystemSettingsTableError(error)) {
+		if (isMissingTableError(error)) {
 			console.log('[demo-reset] System settings table not available after reset; skipping restore.');
 			return false;
 		}
@@ -149,7 +144,7 @@ async function applyDemoBrandingDefaults() {
 		});
 		return true;
 	} catch (error) {
-		if (isMissingSystemSettingsTableError(error)) {
+		if (isMissingTableError(error)) {
 			console.log('[demo-reset] System settings table not available after reset; skipping branding reset.');
 			return false;
 		}

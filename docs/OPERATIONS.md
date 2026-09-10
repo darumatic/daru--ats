@@ -111,6 +111,19 @@ Env:
 - `HEALTH_ALERT_WEBHOOK_URL`
 - `HEALTH_ALERT_SOURCE` (default: `hire-gnome-ats`)
 
+### `/api/health` is the deploy's rollback contract
+
+The production autodeploy rolls back when `/api/health` does not return 200, so
+anything the app cannot function without has to be represented there. A reachable
+database is not sufficient evidence of a working app: the database can answer
+`SELECT 1` while the `SystemSetting` row is unreadable, which reverts branding to
+built-in defaults and switches the public careers site off.
+
+`/api/health` therefore reports `systemSettings: { ok, error, since }` and returns
+**503** when that read fails, so a deploy that breaks it is rolled back instead of
+going live. When adding a dependency the app cannot run without, add it to this
+endpoint's status too, or the deploy gate cannot see it.
+
 ## 4.1) API Trace Headers
 
 All API responses include:
@@ -158,6 +171,34 @@ Env:
 - `SKIP_SYSTEM_SETTINGS_DB_DURING_BUILD`:
 	- `true` (default): uses safe defaults during build.
 	- `false`: allows DB reads during build if DB is reachable.
+
+Because of this skip, **any statically generated route that reads system settings
+bakes in the defaults at build time and never reflects the database.** That is why
+`app/robots.js` and `app/sitemap.js` declare `export const dynamic = 'force-dynamic'`:
+without it they render the "career site disabled" variant permanently, publishing a
+`Disallow: /careers` robots.txt and an empty sitemap even while the careers site is
+live. Any new route reading settings must be request-time rendered for the same reason.
+
+### A settings read must never fail open
+
+`readSystemSettingRecord()` distinguishes "there is no settings row yet" from "the
+read failed", and the difference is load-bearing:
+
+- Read paths (`getSystemSettingRecord()`) still degrade to defaults so the app stays
+	up, but the failure is logged and recorded, never swallowed.
+- Write paths must refuse. `PATCH /api/system-settings` returns 503 when the read
+	failed, because the settings form posts every field on save - saving against a
+	failed read writes the blank form over stored credentials and branding, permanently.
+- `uploadObjectBuffer()` refuses to use the local-disk fallback when the settings
+	could not be read. The fallback is for deployments with no object storage
+	configured; taking it because the config was *unreadable* silently writes uploads
+	to a server filesystem that no backup covers, while the row records `local`.
+
+The failing read is normally schema drift: the code expects a column the database
+does not have. `prisma migrate deploy` is idempotent - run it unconditionally on
+deploy and abort on a non-zero exit rather than trying to detect whether a migration
+is pending, and never hand-apply a migration without recording it in
+`_prisma_migrations`, or every later `migrate deploy` fails on it.
 
 ## 7) Career Site Anti-Abuse Guard
 

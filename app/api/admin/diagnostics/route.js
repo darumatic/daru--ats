@@ -3,7 +3,7 @@ import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { AccessControlError, getActingUser } from '@/lib/access-control';
 import { prisma } from '@/lib/prisma';
-import { getIntegrationSettings, getSystemSettingRecord } from '@/lib/system-settings';
+import { getIntegrationSettings, readSystemSettingRecord } from '@/lib/system-settings';
 import { getObjectStorageConfig } from '@/lib/object-storage';
 import { withApiLogging } from '@/lib/api-logging';
 
@@ -246,15 +246,24 @@ async function runDiagnostics() {
 	}
 
 	try {
-		const setting = await getSystemSettingRecord();
+		// A failed read is not a missing record. Reporting it as "missing, defaults
+		// will be used" sent an operator into the settings form to re-enter
+		// credentials that were never actually lost.
+		const settingsRead = await readSystemSettingRecord();
+		const setting = settingsRead.setting;
 		checks.push(
 			createCheckResult({
 				key: 'system_settings',
 				label: 'System Settings Record',
-				status: setting ? 'pass' : 'warn',
-				message: setting
-					? 'System settings record is present.'
-					: 'System settings record is missing. Defaults will be used.'
+				status: settingsRead.ok ? (setting ? 'pass' : 'warn') : 'fail',
+				message: settingsRead.ok
+					? setting
+						? 'System settings record is present.'
+						: 'System settings record is missing. Defaults will be used.'
+					: 'System settings record could not be read. Stored values are intact but unreadable - do not re-enter settings; check for a pending database migration.',
+				details: settingsRead.ok
+					? undefined
+					: { error: settingsRead.error?.message || 'system_settings_read_failed' }
 			})
 		);
 	} catch (error) {

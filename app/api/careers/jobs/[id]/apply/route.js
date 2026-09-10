@@ -573,15 +573,28 @@ async function postCareerSiteApplication(req, { params }) {
 		]);
 
 		let resumeAttachment = null;
+		let resumeStorageError = null;
+		let uploaded = null;
 		if (resumeFile) {
 			const buffer = resumeBuffer || Buffer.from(await resumeFile.arrayBuffer());
 			const storageKey = buildCandidateAttachmentStorageKey(candidate.id, resumeFile.name);
-			const uploaded = await uploadObjectBuffer({
-				key: storageKey,
-				body: buffer,
-				contentType: resumeFile.type || 'application/octet-stream'
-			});
+			// The candidate and submission are already committed at this point, and a
+			// retry hits the duplicate-application guard - so throwing here would lose
+			// the application entirely and leave the applicant unable to re-apply.
+			// Keep the application, record that the resume did not store.
+			try {
+				uploaded = await uploadObjectBuffer({
+					key: storageKey,
+					body: buffer,
+					contentType: resumeFile.type || 'application/octet-stream'
+				});
+			} catch (error) {
+				resumeStorageError = error?.message || 'resume_upload_failed';
+				console.error('[careers.apply] resume upload failed; application kept without it:', error);
+			}
+		}
 
+		if (uploaded) {
 			resumeAttachment = await prisma.candidateAttachment.create({
 				data: {
 					recordId: createRecordId('CandidateAttachment'),
@@ -612,6 +625,19 @@ async function postCareerSiteApplication(req, { params }) {
 					}
 				})
 			]);
+		} else if (resumeStorageError) {
+			// The application is kept, so the lost resume has to be visible somewhere
+			// a recruiter actually looks - otherwise it reads as an applicant who
+			// simply did not attach one.
+			await prisma.candidateNote
+				.create({
+					data: {
+						candidateId: candidate.id,
+						createdByUserId: null,
+						content: `Career-site application included a resume (${resumeFile.name}) that could not be stored: ${resumeStorageError}. Ask the candidate to re-send it.`
+					}
+				})
+				.catch(() => {});
 		}
 
 		if (jobOrder?.ownerUser?.id) {
