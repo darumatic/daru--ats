@@ -255,6 +255,30 @@ describe('job-order match eligibility', () => {
 		expect(payload.criteria[0].options).toEqual({ referenceValues: ['Atlassian', 'Canva'] });
 	});
 
+	it('carries each criterion\u2019s guidance, so specialising a role keeps the questions', async () => {
+		getMatchCriteriaTemplate.mockResolvedValue([
+			{
+				key: 'big_company',
+				label: 'Big Company',
+				description: 'Worked at a firm of 1000+ headcount.',
+				evaluatorKey: 'big_company',
+				weight: 20,
+				options: { referenceValues: [] }
+			}
+		]);
+		prismaMock.jobOrder.findFirst.mockResolvedValue(buildJobOrder(111));
+		prismaMock.skill.findMany.mockResolvedValue(SKILLS);
+		prismaMock.candidate.findMany.mockResolvedValue([buildCandidate(71)]);
+
+		const payload = await (
+			await jobOrderMatches(new Request('http://localhost/api/job-orders/111/matches'), {
+				params: Promise.resolve({ id: '111' })
+			})
+		).json();
+
+		expect(payload.criteria[0].description).toBe('Worked at a firm of 1000+ headcount.');
+	});
+
 	it('reports a missing job order as a 404', async () => {
 		prismaMock.jobOrder.findFirst.mockResolvedValue(null);
 

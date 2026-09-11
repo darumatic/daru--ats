@@ -44,6 +44,7 @@ function buildMatchRow({ candidate, jobOrder, templateCriteria, skills, overlay 
 		criteria: criteria.map((criterion) => ({
 			key: criterion.key,
 			label: criterion.label,
+			description: criterion.description || '',
 			weight: criterion.weight,
 			evaluatorKey: criterion.evaluatorKey,
 			options: criterion.options || {}

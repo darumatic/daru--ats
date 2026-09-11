@@ -119,6 +119,17 @@ export default function MatchCriteriaEditor({ value, onChange, disabled = false 
 
 						{evaluator ? <p className="panel-subtext match-criteria-hint">{evaluator.hint}</p> : null}
 
+						<label className="match-criteria-guidance">
+							<span>What should this judge?</span>
+							<textarea
+								rows={2}
+								value={criterion.description || ''}
+								placeholder="Sent to the AI as the instruction for this criterion, e.g. “Within commuting distance of Sydney CBD”."
+								disabled={disabled}
+								onChange={(event) => update(index, { description: event.target.value })}
+							/>
+						</label>
+
 						{needsReferenceList ? (
 							<label className="match-criteria-reference">
 								<span>

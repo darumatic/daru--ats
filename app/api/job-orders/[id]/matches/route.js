@@ -181,6 +181,7 @@ async function getJob_orders_id_matchesHandler(req, { params }) {
 		const criteriaPayload = criteria.map((criterion) => ({
 			key: criterion.key,
 			label: criterion.label,
+			description: criterion.description || '',
 			weight: criterion.weight,
 			evaluatorKey: criterion.evaluatorKey,
 			options: criterion.options || {}

@@ -16,6 +16,7 @@ function sameCriterion(a, b) {
 	return (
 		a.key === b.key &&
 		a.label === b.label &&
+		(a.description || '') === (b.description || '') &&
 		a.evaluatorKey === b.evaluatorKey &&
 		Number(a.weight) === Number(b.weight) &&
 		a.aiEnabled === b.aiEnabled &&
@@ -79,6 +80,7 @@ export default function MatchCriteriaAdminPage() {
 						body: JSON.stringify({
 							key: row.key,
 							label: row.label,
+							description: row.description || '',
 							evaluatorKey: row.evaluatorKey,
 							weight: row.weight,
 							aiEnabled: row.aiEnabled,
@@ -93,6 +95,7 @@ export default function MatchCriteriaAdminPage() {
 						body: JSON.stringify({
 							key: row.key,
 							label: row.label,
+							description: row.description || '',
 							evaluatorKey: row.evaluatorKey,
 							weight: row.weight,
 							aiEnabled: row.aiEnabled,

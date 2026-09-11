@@ -235,6 +235,32 @@ describe('PATCH /api/admin/match-criteria/[id]', () => {
 		});
 	});
 
+	it('saves the guidance text, which is what the AI is told to judge', async () => {
+		prismaMock.matchCriterion.findUnique.mockResolvedValue(STORED);
+
+		await updateCriterion(
+			jsonRequest('http://localhost/api/admin/match-criteria/5', 'PATCH', {
+				description: 'Worked at a firm of 1000+ headcount.'
+			}),
+			{ params: Promise.resolve({ id: '5' }) }
+		);
+
+		expect(prismaMock.matchCriterion.update.mock.calls[0][0].data.description).toBe(
+			'Worked at a firm of 1000+ headcount.'
+		);
+	});
+
+	it('clears the guidance to null rather than storing an empty string', async () => {
+		prismaMock.matchCriterion.findUnique.mockResolvedValue({ ...STORED, description: 'old guidance' });
+
+		await updateCriterion(
+			jsonRequest('http://localhost/api/admin/match-criteria/5', 'PATCH', { description: '' }),
+			{ params: Promise.resolve({ id: '5' }) }
+		);
+
+		expect(prismaMock.matchCriterion.update.mock.calls[0][0].data.description).toBeNull();
+	});
+
 	it('reports a missing criterion as a 404', async () => {
 		prismaMock.matchCriterion.findUnique.mockResolvedValue(null);
 

@@ -11444,3 +11444,10 @@ small {
 	color: var(--muted);
 	margin: 0;
 }
+
+.match-criteria-guidance {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	font-size: 0.8rem;
+}

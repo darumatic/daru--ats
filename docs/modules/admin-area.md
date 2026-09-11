@@ -217,7 +217,8 @@ Maintains standardized selectable skill options used by candidate records and ma
 
 ## Match Criteria
 - `Admin Area > Match Criteria` defines the weighted criteria every candidate match is scored against. It is seeded with JD Criteria Match, Location, Local Experience, Big Company and University.
-- Each criterion carries a label, a **weight** (relative, not a percentage), an **evaluator** naming how it is scored, and options for evaluators that need them.
+- Each criterion carries a label, a **weight** (relative, not a percentage), an **evaluator** naming how it is scored, a **guidance** line, and options for evaluators that need them.
+- `What should this judge?` is the guidance sent to the AI as the instruction for that criterion. It has no effect on the deterministic score - the evaluator decides that - so it is worth writing for any criterion you intend to score with AI.
 - Evaluators: `jd_criteria_match` (skills, title and keyword alignment - this is the heuristic that used to be the entire match score), `location` (distance against a radius, falling back to city/state text), `local_experience`, `big_company`, `university`, `experience_years` and `skills_coverage`.
 - `big_company` and `university` need a reference list before they can be scored deterministically - the employers or schools that matter to your market. Left empty they report `not assessed`, which lowers the coverage figure on every match rather than inventing a score.
 - Removing a criterion is a **soft delete**. Stored score breakdowns name the criteria they were computed against, so the row is deactivated rather than deleted. Deactivating every criterion does not trigger a re-seed of the defaults.
