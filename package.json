@@ -59,7 +59,7 @@
 		"sanitize-html": "^2.17.7",
 		"stripe": "^20.4.1",
 		"word-extractor": "^1.0.4",
-		"zod": "^3.25.76"
+		"zod": "^4.5.4"
 	},
 	"devDependencies": {
 		"eslint": "^9.39.4",
